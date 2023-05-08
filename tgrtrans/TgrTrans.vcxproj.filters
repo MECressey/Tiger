@@ -1,0 +1,81 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4db41be4-99fa-4762-a1f8-c50692a716d6}</UniqueIdentifier>
+      <Extensions>cpp;c;cxx;rc;def;r;odl;hpj;bat;for;f90</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{5a1e2016-ea7d-4b4b-a1ff-9f8fad76e507}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;fi;fd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{a69e9461-0dc6-4e4d-a45f-9405b2857aa8}</UniqueIdentifier>
+      <Extensions>ico;cur;bmp;dlg;rc2;rct;bin;cnt;rtf;gif;jpg;jpeg;jpe</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="doaddr.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="doblock.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="doline.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="donames.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="namelook.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SCAN.CPP">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tgrnames.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tgrtrans.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="doaddr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="doblock.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="dogtpoly.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="dohist.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="doline.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="donames.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="dopoly.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="namelook.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tgrnames.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="..\tigerlib\Debug\Tigerlib.lib" />
+    <Library Include="..\..\Lib2\GeoToolsDLL.lib" />
+    <Library Include="..\..\Lib2\DabIODLL.lib" />
+    <Library Include="..\..\Lib2\DbOMDLL.lib" />
+    <Library Include="..\..\Lib2\GeoDBDLL.lib" />
+    <Library Include="..\..\Lib2\TigerDBDLL.lib" />
+    <Library Include="..\..\Lib2\SetsDLL.lib" />
+  </ItemGroup>
+</Project>
