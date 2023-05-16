@@ -75,7 +75,7 @@ static const TCHAR *tigerExts[] =
 	_T(".RT1"),
 	_T(".RT2"),
 	_T(".RT3"),
-	_T("..RT4"),
+	_T(".RT4"),
 	_T(".RT5"),
 	_T(".RT6"),
 	_T(".RT7"),
