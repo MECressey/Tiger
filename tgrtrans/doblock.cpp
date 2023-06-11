@@ -10,8 +10,9 @@ static int MakeBuffer( const TigerRec1 &rec1, char buffer[] )
   int i,
   	  count = 0;
 
-	i = sprintf( &buffer[ count ], "%ld,", rec1.tlid );
+	i = sprintf( &buffer[ count ], "%ld", rec1.tlid );
 	count += i;
+	buffer[count++] = DELIMITER;
 
 	if( rec1.blkl != -1 )
 	{

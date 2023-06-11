@@ -1,3 +1,26 @@
+CREATE TABLE [MEblocks] (
+  tlid int NOT NULL,
+  blkl varchar(6) NULL,
+  blkr varchar(6) NULL,
+  trackl int NULL,
+  trackr int NULL,
+  countyl smallint NOT NULL,
+  countyr smallint NOT NULL,
+  CONSTRAINT [MENames_PK] PRIMARY KEY(tlid)
+);
+
+select * from MEblocks
+where blkl like '%99%' OR blkr like '%99%';
+
+BULK INSERT [MEblocks]
+FROM 'c:\Work\Census\Data\Maine-2006\Waldo\tgr23027b.tab'
+WITH (
+  FIRSTROW = 1,
+  FIELDTERMINATOR = '\t',
+  ROWTERMINATOR = '\n',
+  TABLOCK
+);
+
 CREATE TABLE [23Names] (
   state tinyint NOT NULL,
   county smallint NOT NULL,

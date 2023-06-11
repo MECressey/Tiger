@@ -108,9 +108,10 @@ int main( int argc, char *argv[] )
   	   *csvBlocks2 = 0,
   	   *csvNames = 0,
   	   *csvAddr = 0,
-		   *csvPoly = 0,
+	   *csvPoly = 0,
   	   *inFile1 = 0,
-  	   *inFile2 = 0;
+  	   *inFile2 = 0,
+	   *mappingFile = 0;
   short countyFips;
 	int		stateFips;
   i_rnum *index = 0;
@@ -129,18 +130,18 @@ int main( int argc, char *argv[] )
 	double tlFilter = 0.0001;
 	int doTrendLine = 0/* 1 */;
 
-  if( argc <= 1 )
-  {
-		fputs( "Enter tiger name: ", stdout );
-		fgets( buffer, sizeof( buffer ) - 1, stdin );
-  }
-  else
-  {
+	  if( argc <= 1 )
+	  {
+			fputs( "Enter tiger name: ", stdout );
+			fgets( buffer, sizeof( buffer ) - 1, stdin );
+	  }
+	  else
+	  {
 		strcpy( buffer, argv[ 1 ] );
 
 		if( argc > 2 && ( argv[ 2 ][ 0 ] == '/' || argv[ 2 ][ 0 ] == '-' ) )
 		{
-	    doHistory = doGTpoly = doLines = doNames = doBlocks = doPolys = doAddress = false;
+			doHistory = doGTpoly = doLines = doNames = doBlocks = doPolys = doAddress = false;
 			int i = 1;
 			while( argv[ 2 ][ i ] != '\0' )
 			{
@@ -193,7 +194,7 @@ int main( int argc, char *argv[] )
 			  i++;
 			}
 		}
-  }
+	}
 
 	try
 	{
@@ -254,6 +255,8 @@ int main( int argc, char *argv[] )
 
 	  if( doLines )
 	  {
+		  fName = baseName + "Map.tab";
+		  mappingFile = ::fopen(TString(fName), "w");
 #ifdef TO_TIGERDB
       if( doTigerDB && (error = tDB.Open( TString(argv[3]), 1 )) != 0 )
 			{
@@ -265,7 +268,7 @@ int main( int argc, char *argv[] )
 /*			rt1Name.SetAt( length - 1, '2' );*/
 			nIndex = DoShapeIndex( rt1Name, &index );
 			inFile2 = ::fopen( TString(rt1Name), "r" );
-	    fName = baseName + _T("l.tab");
+			fName = baseName + _T("l.tab");
 			csvLines = fopen( TString(fName), "w" );
 
 			nLook.stateFips = stateFips;
@@ -492,7 +495,7 @@ NEXT_LINE :
 				}
 
 			  long offset;
-	      if( BinarySearch( rec1.tlid, index, nIndex, &offset ) )
+			  if( BinarySearch( rec1.tlid, index, nIndex, &offset ) )
 			  {
 			    TigerRec2 rec2;
 			    long tlid = 0;
@@ -537,10 +540,11 @@ NEXT_LINE :
 	//			 	line->Set( id );
 			 		line->SetCode( cCode );
 					line->SetName( names, nNames );
+					line->SetTLID(rec1.tlid);
 					line->write();
-	#ifdef _DEBUG
-					fprintf( stdout, "TLID: %ld (%ld)\n", rec1.tlid, line->dbAddress() );
-	#endif
+	//#ifdef _DEBUG
+					fprintf(mappingFile, "%ld\t%ld\n", rec1.tlid, line->dbAddress() );
+	//#endif
 					fflush( stdout );
 					dbo.Unlock();
 			
@@ -586,6 +590,7 @@ NEXT_LINE :
 	    if( csvBlocks2 ) fclose( csvBlocks2 );
 	    if( csvPoly ) fclose( csvPoly );
 	    if( inFile2 ) fclose( inFile2 );
+		if (mappingFile) fclose(mappingFile);
 	  }
 
 	  fclose( inFile1 );
