@@ -221,6 +221,7 @@
   <ItemGroup>
     <ClCompile Include="doaddr.cpp" />
     <ClCompile Include="doblock.cpp" />
+    <ClCompile Include="dogtpoly.cpp" />
     <ClCompile Include="doline.cpp" />
     <ClCompile Include="donames.cpp" />
     <ClCompile Include="namelook.cpp" />
@@ -240,6 +241,7 @@
     <ClInclude Include="tgrnames.h" />
   </ItemGroup>
   <ItemGroup>
+    <Library Include="..\..\Lib2\CxxToolsLib.lib" />
     <Library Include="..\..\Lib2\DabIODLL.lib" />
     <Library Include="..\..\Lib2\DbOMDLL.lib" />
     <Library Include="..\..\Lib2\GeoDBDLL.lib" />

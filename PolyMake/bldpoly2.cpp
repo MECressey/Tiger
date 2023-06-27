@@ -851,7 +851,7 @@ FOUND_ONE :
 				//po.Unlock();
 				tDB.Add(po);
 
-				for (int i = lineCount; --i > 0;)
+				for (int i = lineCount; --i >= 0;)
 				//	for (int i = 0; i < lineCount; i++)
 				{
 					const DirLineId& lineId = polyIds[i];

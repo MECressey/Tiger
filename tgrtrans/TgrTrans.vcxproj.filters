@@ -39,6 +39,9 @@
     <ClCompile Include="tgrtrans.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="dogtpoly.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="doaddr.h">
@@ -77,5 +80,6 @@
     <Library Include="..\..\Lib2\GeoDBDLL.lib" />
     <Library Include="..\..\Lib2\TigerDBDLL.lib" />
     <Library Include="..\..\Lib2\SetsDLL.lib" />
+    <Library Include="..\..\Lib2\CxxToolsLib.lib" />
   </ItemGroup>
 </Project>

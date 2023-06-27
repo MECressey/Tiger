@@ -8,7 +8,8 @@ struct TigerRec8
   int version;
   int state;
   int county;
-  int cenid;		// just county code
+  //int cenid;		// just county code
+  char cenid[5];
   long polyid;
   long land;
 

@@ -19,19 +19,23 @@ int TigerRecI::GetNextRec( FILE *file )
 
   scan.Get( &cc );		// Record type
   scan.Get( &this->version, 4 );
-  scan.Get( &this->tlid, 10 );
   scan.Get( &this->state, 2 );
   scan.Get( &this->county, 3 );
-  scan.Get( &this->rtlink );
-  scan.Get( &state, 2 );
-  if( scan.Get( &this->cenidl, 3 ) == 0 )
-    this->cenidl = -1;
+  scan.Get(&this->tlid, 10);
+  scan.Get(&this->tzids, 10);
+  scan.Get(&this->tzide, 10);
+  //scan.Get( &this->rtlink );
+  scan.Get(this->cenidl, sizeof(this->cenidl));
+  /*scan.Get(&state, 2);
+  if (scan.Get(&this->cenidl, 3) == 0)
+    this->cenidl = -1;*/
   if( scan.Get( &this->polyidl, 10 ) == 0 )
     this->polyidl = -1;
 
-  scan.Get( &state, 2 );
+  scan.Get(this->cenidr, sizeof(this->cenidr));
+  /*scan.Get(&state, 2);
   if( scan.Get( &this->cenidr, 3 ) == 0 )
-    this->cenidr = -1;
+    this->cenidr = -1;*/
 
   if( scan.Get( &this->polyidr, 10 ) == 0 )
     this->polyidr = -1;

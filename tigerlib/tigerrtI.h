@@ -6,13 +6,17 @@
 struct TigerRecI
 {
   int version;
-  long tlid;
   int state;
   int county;
-  char rtlink;
-  int cenidl;		// just county code
+  long tlid;
+  int tzids;
+  int tzide;
+  //char rtlink;
+  //int cenidl;		// just county code
+  char cenidl[5];
   long polyidl;
-  int cenidr;		// just county code
+  char cenidr[5];
+  //int cenidr;		// just county code
   long polyidr;
 
   int GetNextRec( FILE * );

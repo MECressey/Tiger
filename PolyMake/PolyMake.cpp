@@ -16,8 +16,16 @@
 #include "NODETABL.HPP"
 #include "polynode.HPP"
 #include "bldpoly2.h"
+//#include "dac.hpp"
 
 //#ifdef SAVE_FOR_NOW
+
+class DbHash : public DbHashAccess {
+public:
+	long tlid;
+	int is_equal(DbObject* dbo) { return this->tlid == ((TigerDB::Chain*)dbo)->GetTLID(); }
+	long int hashKey(int nBits) { return HashTable::HashDK(nBits, tlid); }
+};
 
 static int BlkFind(const CString& blk)
 {
@@ -190,6 +198,7 @@ int FillTopoTables(
 
 int FillPolyTables(
 	std::map<int, int> &tlidMap,
+	//DAC &dac,
 	TigerDB &db,
 	int nLines,
 	CArray<DirLineId, DirLineId&>& lineIds,
@@ -204,8 +213,14 @@ int FillPolyTables(
 			const DirLineId& lid = lineIds.GetAt(i);
 			long tlid = lid.id;
 
-			std::map<int, int>::iterator it = tlidMap.find(tlid);
-			if (it == tlidMap.end())
+			ObjHandle oh;
+			DbHash dbHash;
+			dbHash.tlid = tlid;
+			int err = db.dacSearch(DB_TIGER_LINE, &dbHash, oh);
+
+			if (err != 0)
+			//std::map<int, int>::iterator it = tlidMap.find(tlid);
+			//if (it == tlidMap.end())
 			//if (!lineById.Requery() || lineById.IsEOF())
 			{
 				DirLineId lineId;
@@ -217,8 +232,8 @@ int FillPolyTables(
 					fprintf(stderr, "* FillPolyTables: cannot find line: %ld\n", tlid);
 				continue;
 			}
-			ObjHandle oh;
-			int err = db.Read(it->second, oh);
+			//ObjHandle oh;
+			//int err = db.Read(it->second, oh);
 			TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
 			FillTopoTables(line, &lTable, &nTable);
 			oh.Unlock();
@@ -307,10 +322,13 @@ int main(int argc, char* argv[])
 		CString baseName = "ME"/*argv[1]*/;
 		TigerDB tDB(&db);
 
-		int err = tDB.Open(TString("C:\\Work\\Waldo2006poly.gdb")/*argv[3])*/, 1);
+		int err = tDB.Open(TString(/*"C:\\Work\\Waldo2006poly.gdb")*/argv[1]), 1);
 
 		std::map<int, int> tlidMap;
 		FILE* file = ::fopen("C:\\Work\\Census\\Data\\Maine-2006\\Waldo\\TGR23027Map.tab", "r");
+		short s;
+		//DAC dac;
+		//err = dac.open(TString("C:\\Work\\Waldo2006.dac"), 0, 1, &s);
 
 		char record[100];
 		while (::fgets(record, sizeof(record) - 1, file) != NULL)
@@ -320,8 +338,17 @@ int main(int argc, char* argv[])
 			int tlid = atoi(record);
 			int recPtr = atoi(++pos);
 
+			ObjHandle oh;
+			DbHash dbHash;
+			dbHash.tlid = tlid;
+			err = tDB.dacSearch(5, &dbHash, oh);
+			TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
+			int rec = line->dbAddress();
+			assert(rec == recPtr);
 			tlidMap.insert({ tlid, recPtr });
+			oh.Unlock();
 		}
+
 #ifdef TESTING_POLYGON
 		// Creating a polygon
 		ObjHandle po;

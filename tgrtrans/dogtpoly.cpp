@@ -14,11 +14,13 @@ void DoGTpoly( FILE *file, const TigerRecI &rec )
   i = sprintf( buffer, "%ld,", rec.tlid );
   count += i;
 
-  if( rec.cenidl != -1 )
+  /*if (rec.cenidl != -1)
   {
     i = sprintf( &buffer[ count ], "%d", rec.cenidl );
     count += i;
-  }
+  }*/
+  memcpy(&buffer[count], rec.cenidl, sizeof(rec.cenidl));
+  count += sizeof(rec.cenidl);
   buffer[ count++ ] = ',';
 	
   if( rec.polyidl != -1 )
@@ -28,11 +30,13 @@ void DoGTpoly( FILE *file, const TigerRecI &rec )
   }
   buffer[ count++ ] = ',';
 
-  if( rec.cenidr != -1 )
+  /*if (rec.cenidr != -1)
   {
     i = sprintf( &buffer[ count ], "%d", rec.cenidr );
     count += i;
-  }
+  }*/
+  memcpy(&buffer[count], rec.cenidr, sizeof(rec.cenidr));
+  count += sizeof(rec.cenidr);
   buffer[ count++ ] = ',';
 	
   if( rec.polyidr != -1 )
@@ -52,14 +56,20 @@ void DoLMlink( FILE *file, const TigerRec8 &rec )
   int i,
   	  count = 0;
 
+  i = sprintf(&buffer[count], "%d,", rec.state);
+  count += i;
+
   i = sprintf( &buffer[ count ], "%d,", rec.county );
   count += i;
 
   i = sprintf( &buffer[ count ], "%ld,", rec.land );
   count += i;
   
-  i = sprintf( &buffer[ count ], "%d,", rec.cenid );
-  count += i;
+  /*i = sprintf(&buffer[count], "%d,", rec.cenid);
+  count += i;*/
+  memcpy(&buffer[count], rec.cenid, sizeof(rec.cenid));
+  count += sizeof(rec.cenid);
+  buffer[count++] = ',';
 
   i = sprintf( &buffer[ count ], "%ld", rec.polyid );
   count += i;
@@ -111,7 +121,8 @@ void DoLMpoint( FILE *file, const TigerRec7 &rec )
   char buffer[ 80 ];
   int i,
   	  count = 0;
-  GEOPOINT pt;
+  XY_t pt;
+  //GEOPOINT pt;
   
   if( ( i = strlen( (const char *)rec.laname ) ) == 0 )
   {
@@ -125,7 +136,7 @@ void DoLMpoint( FILE *file, const TigerRec7 &rec )
   }
   buffer[ count++ ] = ',';
 
-  TigerToGeoPoint( rec.lalong, rec.lalat, &pt.lon, &pt.lat );
+  TigerToGeoPoint( rec.lalong, rec.lalat, &pt.x, &pt.y );
 
   i = sprintf( &buffer[ count ], "%d,", rec.county );
   count += i;
@@ -140,10 +151,10 @@ void DoLMpoint( FILE *file, const TigerRec7 &rec )
   buffer[ count++ ] = rec.source;
   buffer[ count++ ] = ',';
 
-  i = sprintf( &buffer[ count ], "%ld,", pt.lat );
+  i = sprintf( &buffer[ count ], "%ld,", pt.y );
   count += i;
 
-  i = sprintf( &buffer[ count ], "%ld", pt.lon );
+  i = sprintf( &buffer[ count ], "%ld", pt.x );
   count += i;
 
   buffer[ count++ ] = '\n';

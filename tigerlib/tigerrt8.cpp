@@ -21,8 +21,9 @@ int TigerRec8::GetNextRec( FILE *file )
   scan.Get( &this->version, 4 );
   scan.Get( &this->state, 2 );
   scan.Get( &this->county, 3 );
-  scan.Get( &state, 2 );
-  scan.Get( &this->cenid, 3 );
+  /*scan.Get(&state, 2);
+  scan.Get( &this->cenid, 3 );*/
+  scan.Get(this->cenid, sizeof(this->cenid));
   scan.Get( &this->polyid, 10 );
   scan.Get( &this->land, 10 );
 

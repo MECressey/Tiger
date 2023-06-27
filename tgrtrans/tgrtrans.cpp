@@ -15,7 +15,7 @@
 //#include "dopoly.h"
 #include "doaddr.h"
 #include "donames.h"
-//#include "dogtpoly.h"
+#include "dogtpoly.h"
 //#include "dohist.h"
 #include "tgrnames.h"
 #include "namelook.h"
@@ -24,6 +24,13 @@
 #include "tigerdb.hpp"
 #include "trendlin.h"
 #include "doline.h"
+//#include "DAC.HPP"
+#include <map>
+#include <array>
+#include <vector>
+#include <algorithm>
+#include <assert.h>
+#include "HASHTABL.HPP"
 
 #include "TString.h"
 
@@ -49,6 +56,8 @@ static int __cdecl compare( const void *, const void * );
 static long DoShapeIndex( const TCHAR *, i_rnum ** );
 static int BinarySearch( long rnum, i_rnum *, long, long * );
 static TigerDB::Classification MapCFCC( const char *cfcc );
+static double CalcArea(/*TigerDB::Chain* line*/XY_t pts[], int nPts,
+	const double& xcom, const double& ycom, double* xcg, double* ycg, int dir);
 
 static XY_t points[10000];
 
@@ -91,6 +100,13 @@ static const TCHAR *tigerExts[] =
 	_T(".RTZ"),
 };
 
+class DbHash : public DbHashAccess {
+public:
+	long tlid;
+	int is_equal(DbObject* dbo) { return this->tlid == ((TigerDB::Chain*)dbo)->GetTLID(); }
+	long int hashKey(int nBits) { return HashTable::HashDK(nBits, tlid); }
+};
+
 int main( int argc, char *argv[] )
 {
   char buffer[512];
@@ -130,13 +146,13 @@ int main( int argc, char *argv[] )
 	double tlFilter = 0.0001;
 	int doTrendLine = 0/* 1 */;
 
-	  if( argc <= 1 )
-	  {
-			fputs( "Enter tiger name: ", stdout );
-			fgets( buffer, sizeof( buffer ) - 1, stdin );
-	  }
-	  else
-	  {
+	if( argc <= 1 )
+	{
+		fputs( "Enter tiger name: ", stdout );
+		fgets( buffer, sizeof( buffer ) - 1, stdin );
+	}
+	else
+	{
 		strcpy( buffer, argv[ 1 ] );
 
 		if( argc > 2 && ( argv[ 2 ][ 0 ] == '/' || argv[ 2 ][ 0 ] == '-' ) )
@@ -204,6 +220,7 @@ int main( int argc, char *argv[] )
 		db.SetSynchronousMode(TRUE);
 #ifdef TO_TIGERDB
 		TigerDB tDB(&db);
+		//DAC dac;
 #endif
 		CString rootName;
 
@@ -221,7 +238,7 @@ int main( int argc, char *argv[] )
 //		rt1Name += tigerExts[RT1_EXT];
 	  if( ( inFile1 = ::fopen( TString(rt1Name), "r" ) ) == NULL )
 	  {
-		printf( "* TgrTrans - cannot open required Tiger record 1 file" );
+			printf( "* TgrTrans - cannot open required Tiger record 1 file" );
 	    goto ERR_RETURN;
 	  }
 
@@ -257,8 +274,12 @@ int main( int argc, char *argv[] )
 	  {
 		  fName = baseName + "Map.tab";
 		  mappingFile = ::fopen(TString(fName), "w");
+			error = tDB.dacCreate(TString(argv[3]), 1 << 16);
+			//error = dac.create(TString("C:\\Work\\Waldo2006.dac"), 1 << 16);
+			//short s;
+			//error = dac.open(TString("C:\\Work\\Waldo2006.dac"), 0, 1, &s);
 #ifdef TO_TIGERDB
-      if( doTigerDB && (error = tDB.Open( TString(argv[3]), 1 )) != 0 )
+      if( doTigerDB && (error = tDB.Open( TString(argv[3]), 1)) != 0 )
 			{
 				fprintf( stderr, "* Cannot open Tiger DB: %s\n", argv[ 3 ] );
 				goto CLEAN_UP;
@@ -542,15 +563,17 @@ NEXT_LINE :
 					line->SetName( names, nNames );
 					line->SetTLID(rec1.tlid);
 					line->write();
-	//#ifdef _DEBUG
 					fprintf(mappingFile, "%ld\t%ld\n", rec1.tlid, line->dbAddress() );
 	//#endif
 					fflush( stdout );
+					error = tDB.dacInsert(line, line);
+					//error = dac.insert(line, line);
 					dbo.Unlock();
 			
-					tDB.Add( dbo );
+					error = tDB.Add( dbo );
 					tDB.TrBegin();
-					tDB.TrEnd();
+					error = tDB.TrEnd();
+					//error = dac.trend();
 #endif
 				}
 				else
@@ -590,7 +613,7 @@ NEXT_LINE :
 	    if( csvBlocks2 ) fclose( csvBlocks2 );
 	    if( csvPoly ) fclose( csvPoly );
 	    if( inFile2 ) fclose( inFile2 );
-		if (mappingFile) fclose(mappingFile);
+			if (mappingFile) fclose(mappingFile);
 	  }
 
 	  fclose( inFile1 );
@@ -651,43 +674,322 @@ NEXT_LINE :
 	    }
 	    fclose( csvAddr );
 	  }
-#ifdef DO_LATER
-//
-//	Process History file - Tiger 94
-//
-	  if( doHistory )
-	  {
-	  	FILE *csvFile = 0;
 
-			rt1Name = rootName + tigerExts[RTH_EXT];
-//	    rt1Name.SetAt( length - 1, 'H' );
-	    if( ( inFile1 = fopen( rt1Name, "r" ) ) != 0 )
-	    {
-			  TigerRecH rec;
-
-			  fName = baseName + "H.csv";
-			  if( ( csvFile = fopen( fName, "w" ) ) == 0 )
-			  {
-			    printf( "* Cannot open %s\n", (const char *)fName );
-			    fclose( inFile1 );
-			    goto ERR_RETURN;
-			  }
-
-			  while( rec.GetNextRec( inFile1 ) > 0 )
-			  {
-			    DoHistory( csvFile, rec );
-			  }
-			  fclose( inFile1 );
-	    }
-			if( csvFile )
-			  fclose( csvFile );
-	  }
 //
 //	Process record "I" - GT/Poly-Chain link
 //
 	  if( doGTpoly )
 	  {
 			FILE *csvFile = 0;
+			error = tDB.Open(TString(argv[3]), 1);
+
+//
+//	Load record "8" - Landmark links into memory
+//
+			rt1Name = rootName + tigerExts[RT8_EXT];
+			if ((inFile1 = fopen(rt1Name, "r")) == 0)
+			{
+				printf("Cannot open %s\n", (const char*)rt1Name);
+				goto ERR_RETURN;
+			}
+
+			struct LMLink {
+				char cenid[6];
+				long polyid;
+			};
+			std::map<int, LMLink> llMap;
+			TigerRec8 rec8;
+			int count = 0;
+			while (rec8.GetNextRec(inFile1) > 0)
+			{
+				LMLink ll;
+				memcpy(ll.cenid, rec8.cenid, sizeof(rec8.cenid));
+				ll.cenid[5] = '\0';
+				ll.polyid = rec8.polyid;
+				llMap.insert({ rec8.land, ll });
+				count++;
+				//DoLMlink(csvFile, rec8);
+			}
+			fclose(inFile1);
+//
+// Load GT polygons
+			rt1Name = rootName + tigerExts[RTI_EXT];
+			if ((inFile1 = fopen(rt1Name, "r")) == 0)
+			{
+				printf("Cannot open %s\n", (const char*)rt1Name);
+				goto ERR_RETURN;
+			}
+			struct GTPoly {
+				long tlid;
+				char cenidl[6];
+				long polyidl;
+				char cenidr[6];
+				long polyidr;
+			};
+			std::vector<GTPoly> gtPolys;
+			count = 0;
+			TigerRecI recI;
+			while (recI.GetNextRec(inFile1) > 0)
+			{
+				GTPoly gtp;
+				gtp.tlid = recI.tlid;
+				memcpy(gtp.cenidl, recI.cenidl, sizeof(recI.cenidl));
+				gtp.cenidl[5] = '\0';
+				gtp.polyidl = recI.polyidl;
+				memcpy(gtp.cenidr, recI.cenidr, sizeof(recI.cenidr));
+				gtp.cenidr[5] = '\0';
+				gtp.polyidr = recI.polyidr;
+				gtPolys.push_back(gtp);
+				count++;
+				//DoGTpoly(csvFile, recI);
+			}
+
+//
+//	Process record "7" - Landmark links
+//
+			rt1Name = rootName + tigerExts[RT7_EXT];
+			if ((inFile1 = fopen(rt1Name, "r")) == 0)
+			{
+				printf("Cannot open %s\n", (const char*)rt1Name);
+				goto ERR_RETURN;
+			}
+
+			struct DirLineId
+			{
+				long tlid;
+				signed char dir;
+			};
+
+			// Process Landmark polygons
+			TigerRec7 rec7;
+			while (rec7.GetNextRec(inFile1) > 0)
+			{
+				std::vector<DirLineId> dirLineIds;
+				if (rec7.lalong != -1 || rec7.lalat != -1)  // Point Landmarks
+					continue;
+				if (rec7.cfcc[0] != 'H')  // Temporary
+					continue;
+				std::map<int, LMLink>::iterator it = llMap.find(rec7.land);
+				if (it == llMap.end())
+					continue;
+				count = 0;
+
+				// Search for the GT poly records
+				LMLink ll = it->second;
+				for (std::vector<GTPoly>::iterator it2 = gtPolys.begin(); it2 != gtPolys.end(); ++it2)
+				{
+					DirLineId dl;
+					if (strcmp(it2->cenidl, ll.cenid) == 0 && it2->polyidl == ll.polyid)
+					{
+						dl.tlid = it2->tlid;
+						dl.dir = -1;
+						dirLineIds.push_back(dl);
+						count++;
+					}
+					else if (strcmp(it2->cenidr, ll.cenid) == 0 && it2->polyidr == ll.polyid)
+					{
+						dl.tlid = it2->tlid;
+						dl.dir = 1;
+						dirLineIds.push_back(dl);
+						count++;
+					}
+				}
+				printf("Count = %ld\n", count);
+				if (count == 1)
+					continue;
+				printf("Processing: %d, name: %s\n", rec7.land, rec7.laname);
+				int err;
+				struct PolySegment
+				{
+					double area;
+					Range2D mbr;
+					int start, end;
+				};
+				std::vector<DirLineId> orderedLines;
+				std::vector<PolySegment> polySegs;
+
+				int start = 0;
+				DbHash dbHash;
+				while (dirLineIds.size() > 0)
+				{
+					DirLineId dl = dirLineIds[0];
+					orderedLines.push_back(dl);
+					dirLineIds[0] = dirLineIds.back();// [dirLineIds.size() - 1] ;
+					dirLineIds.pop_back();
+					//
+	//	Go through & calculate area, centroid & MBR
+	//
+					XY_t sPt,
+						ePt;
+					ObjHandle oh;
+
+					dbHash.tlid = dl.tlid;
+					err = tDB.dacSearch(DB_TIGER_LINE, &dbHash, oh);
+					TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
+					Range2D mbr;
+					mbr = line->GetMBR();
+					line->GetNodes(&sPt, &ePt);
+					line->Get(points);
+					int nPts = line->GetNumPts();
+					oh.Unlock();
+					XY_t lastPt,
+						startPt;
+					if (dl.dir > 0)
+						lastPt = ePt;
+					else
+					{
+						lastPt = sPt;
+						sPt = ePt;
+					}
+
+					double xcg = 0.0,
+						ycg = 0.0,
+						xcom = sPt.x,
+						ycom = sPt.y,
+						rval = 0.0;
+
+					double area = CalcArea(points, nPts, xcom, ycom, &xcg, &ycg, 1);
+					if (dl.dir > 0)
+						rval += area;
+					else
+						rval -= area;
+					/*if (dl.dir < 0)
+						rval += CalcArea(points, nPts, xcom, ycom, &xcg, &ycg, -1);
+					else
+						rval += CalcArea(points, nPts, xcom, ycom, &xcg, &ycg, 1);*/
+					int nSegs = 1;
+					while (!(lastPt == sPt))
+					{
+						int i;
+						bool found = false;
+						for (i = 0; i < dirLineIds.size(); i++)
+						{
+							dl = dirLineIds[i];
+							dbHash.tlid = dl.tlid;
+							err = tDB.dacSearch(DB_TIGER_LINE, &dbHash, oh);
+							TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
+							XY_t sNode, eNode;
+							line->GetNodes(&sNode, &eNode);
+							mbr.Envelope(line->GetMBR());
+							line->Get(points);
+							nPts = line->GetNumPts();
+							oh.Unlock();
+							if (dl.dir < 0)
+							{
+								XY_t temp = eNode;
+								eNode = sNode;
+								sNode = temp;
+							}
+							if (sNode == lastPt)
+							{
+								double area = CalcArea(points, nPts, xcom, ycom, &xcg, &ycg, 1);
+								if (dl.dir > 0)
+									rval += area;
+								else
+									rval -= area;
+								/*if (dl.dir < 0)
+								{
+									rval += CalcArea(points, nPts, xcom, ycom, &xcg, &ycg, -1);
+								}
+								else
+								{
+									rval += CalcArea(points, nPts, xcom, ycom, &xcg, &ycg, 1);
+								}*/
+								lastPt = eNode;
+								orderedLines.push_back(dl);
+								dirLineIds[i] = dirLineIds.back();// [dirLineIds.size() - 1] ;
+								dirLineIds.pop_back();
+								nSegs += 1;
+								found = true;
+								break;
+							}
+						}
+						if (!found)
+						{
+							printf("** Processing %d, did not find a closed loop.  Directed Edges left: %d\n", rec7.land, dirLineIds.size());
+							nSegs = 0;
+							break;
+						}
+						//assert(i < dirLineIds.size());
+					}
+					if (nSegs == 0)  // Error condition!
+					{
+						break;
+					}
+					PolySegment ps;
+					if (rval < 0.0)
+						rval = -rval;
+					ps.area = rval;
+					ps.mbr = mbr;
+					ps.start = start;
+					ps.end = orderedLines.size();
+					start += nSegs;
+					polySegs.push_back(ps);
+				}
+				
+				struct greater_than_key
+				{
+					inline bool operator() (const PolySegment& struct1, const PolySegment& struct2)
+					{
+						return (struct1.area > struct2.area);
+					}
+				};
+
+				std::sort(polySegs.begin(), polySegs.end(), greater_than_key());
+				/*//int last = 0;
+				for (int i = 0; i < polySegs.size(); i++)
+				{
+					printf("Polyseg - Area: %.6f, Count: %d\n", polySegs[i].area, polySegs[i].end - polySegs[i].start);
+					//last = polySegs[i].end;
+				}*/
+				ObjHandle po;
+				TigerDB::Polygon* poly = 0;
+				for (int j = 0; j < polySegs.size(); j++)
+				{
+					PolySegment ps = polySegs[j];
+					/**/
+
+					if (j == 0)
+					{
+						if ((err = tDB.NewObject(DB_TIGER_POLY, po)) != 0)
+						{
+							fprintf(stderr, "**dbOM.newObject failed\n");
+						}
+
+						poly = (TigerDB::Polygon*)po.Lock();
+						poly->SetCode(MapCFCC(rec7.cfcc));
+						poly->SetArea(ps.area);
+						poly->SetMBR(ps.mbr);
+
+						poly->write();
+						//po.Unlock();
+						tDB.Add(po);
+					}
+					for (int i = ps.end; --i >= ps.start; )
+						//	for (int i = 0; i < lineCount; i++)
+					{
+						DirLineId& lineId = orderedLines[i];
+						dbHash.tlid = lineId.tlid;
+						ObjHandle eh;
+						err = tDB.dacSearch(DB_TIGER_LINE, &dbHash, eh);
+						if (j > 0)
+							lineId.dir = -lineId.dir;
+						err = poly->AddEdge(eh, lineId.dir);
+					}
+					break;  // Islands don't work now
+				}
+				if (poly != 0)
+				{
+					po.Unlock();
+
+					tDB.TrBegin();
+					tDB.TrEnd();
+				}
+				/**/
+
+				//DoLMarea(csvFile, rec7);
+			}
+/*
 			rt1Name = rootName + tigerExts[RTI_EXT];
 //	    rt1Name.SetAt( length - 1, 'i' );
 	    if( ( inFile1 = fopen( rt1Name, "r" ) ) == 0 )
@@ -779,9 +1081,41 @@ NEXT_LINE :
 			fclose( inFile1 );
 			fclose( inFile2 );
 			fclose( csvFile );
+*/
 	  }
+#ifdef DO_LATER
+		//
+		//	Process History file - Tiger 94
+		//
+		if (doHistory)
+		{
+			FILE* csvFile = 0;
 
-	  if( doZips || version == TIGER_94 )
+			rt1Name = rootName + tigerExts[RTH_EXT];
+			//	    rt1Name.SetAt( length - 1, 'H' );
+			if ((inFile1 = fopen(rt1Name, "r")) != 0)
+			{
+				TigerRecH rec;
+
+				fName = baseName + "H.csv";
+				if ((csvFile = fopen(fName, "w")) == 0)
+				{
+					printf("* Cannot open %s\n", (const char*)fName);
+					fclose(inFile1);
+					goto ERR_RETURN;
+				}
+
+				while (rec.GetNextRec(inFile1) > 0)
+				{
+					DoHistory(csvFile, rec);
+				}
+				fclose(inFile1);
+			}
+			if (csvFile)
+				fclose(csvFile);
+		}
+	  
+		if( doZips || version == TIGER_94 )
 	  {
 	  	FILE *csvFile = 0;
 			TigerRecZ rec;
@@ -1529,4 +1863,78 @@ static int BinarySearch( long rnum, i_rnum *idx, long cnt, long *pos )
   }
 
   return( ret );
+}
+
+inline void DoCalc(
+	const XY_t& pt,
+	const double& xcom, const double& ycom,
+	double& xold, double& yold,
+	double* xcg, double* ycg, double& area
+)
+{
+	double x = (double)pt.x,
+		y = (double)pt.y,
+		aretri = (xcom - x) * (yold - ycom) + (xold - xcom) * (y - ycom);
+
+	*xcg += aretri * (x + xold);
+	*ycg += aretri * (y + yold);
+	area += aretri;
+	xold = x;
+	yold = y;
+}
+
+static double CalcArea(XY_t pts[], int nPts,
+	const double& xcom, const double& ycom, double* xcg, double* ycg, int dir)
+{
+	double area = 0.0;
+
+	if (dir > 0)
+	{
+		double xold = pts[ 0 ].x,
+			yold = pts[ 0].y;
+
+		if (nPts > 2)
+		{
+			for (int i = 1; i < nPts; i++)
+			{
+				double x = pts[i].x,
+					y = pts[i].y,
+					aretri = (xcom - x) * (yold - ycom) + (xold - xcom) * (y - ycom);
+
+				*xcg += aretri * (x + xold);
+				*ycg += aretri * (y + yold);
+				area += aretri;
+				xold = x;
+				yold = y;
+			}
+		}
+		else
+			DoCalc(pts[nPts - 1], xcom, ycom, xold, yold, xcg, ycg, area);
+	}
+	else
+	{
+		--nPts;
+		double xold = pts[ nPts ].x,
+			yold = pts[ nPts ].y;
+
+		if (nPts > 2)
+		{
+			for (int i = nPts - 1; --i >= 0; )
+			{
+				double x = pts[i].x,
+					y = pts[i].y,
+					aretri = (xcom - x) * (yold - ycom) + (xold - xcom) * (y - ycom);
+
+				*xcg += aretri * (x + xold);
+				*ycg += aretri * (y + yold);
+				area += aretri;
+				xold = x;
+				yold = y;
+			}
+		}
+		else
+			DoCalc(pts[0], xcom, ycom, xold, yold, xcg, ycg, area);
+	}
+
+	return(area);
 }
