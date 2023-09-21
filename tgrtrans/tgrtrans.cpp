@@ -4,9 +4,14 @@
 #include <search.h>
 #include <limits.h>
 #include <stdio.h>
+//#include <cstdio>
 #include <sys\types.h>
 #include <sys\stat.h>
 #include <wchar.h>
+//#include <string.h>
+#include <iostream>
+#include <string>
+#include <fstream>
 #include "tigerrec.hpp"
 #include "tigerlib.h"
 #include "range.hpp"
@@ -43,8 +48,13 @@ const int TIGER_94	= 21;
 
 static short GetStateFips( const TCHAR * );
 static short GetCountyFips( const TCHAR * );
-
-
+/*
+struct DirLineId
+{
+	long tlid;
+	signed char dir;
+};
+*/
 struct i_rnum
 {
    long rnum;
@@ -58,8 +68,9 @@ static int BinarySearch( long rnum, i_rnum *, long, long * );
 static TigerDB::Classification MapCFCC( const char *cfcc );
 static double CalcArea(/*TigerDB::Chain* line*/XY_t pts[], int nPts,
 	const double& xcom, const double& ycom, double* xcg, double* ycg, int dir);
+//static bool isPolygonMatch(ObjHandle &poly, std::vector<DirLineId>& polyLines, int start, int end);
 
-static XY_t points[10000];
+static XY_t points[15000];
 
 #define RT1_EXT				0
 #define RT2_EXT				1
@@ -132,7 +143,8 @@ int main( int argc, char *argv[] )
 	int		stateFips;
   i_rnum *index = 0;
   long nIndex;
-  bool doLines = true,
+	bool doCreate = false,
+			 doLines = true,
   	   doNames = true,
 		   doBlocks = true,
 		   doPolys = true,
@@ -153,21 +165,26 @@ int main( int argc, char *argv[] )
 	}
 	else
 	{
-		strcpy( buffer, argv[ 1 ] );
+		strcpy(buffer, argv[1]);
 
 		if( argc > 2 && ( argv[ 2 ][ 0 ] == '/' || argv[ 2 ][ 0 ] == '-' ) )
 		{
-			doHistory = doGTpoly = doLines = doNames = doBlocks = doPolys = doAddress = false;
+			doHistory = doGTpoly = doLines = doNames = doBlocks = doPolys = doAddress = doCreate = false;
 			int i = 1;
-			while( argv[ 2 ][ i ] != '\0' )
+			while( argv[2][i] != '\0' )
 			{
-	      switch( argv[ 2 ][ i ] )
+	      switch( argv[2][i] )
 			  {
 			  default :
 			    printf( "* TgrTrans - invalid argument\n" );
 				goto USAGE_ERROR;
 
-			  case 'I' :
+				case 'C':
+				case 'c':
+					doCreate = true;
+					break;
+
+				case 'I' :
 			  case 'i' :
 			    doGTpoly = true;
 					break;
@@ -234,6 +251,53 @@ int main( int argc, char *argv[] )
 	  if( buffer[ length - 1 ] == '\n' )
 			buffer[ length - 1 ] = '\0';
     
+		if (doCreate)
+		{
+			char input[80];
+			double xmin,  // 204
+				xmax,
+				ymax,	//520,
+				ymin;
+
+			/*printf("\nDatabase name? ");
+			if (gets(input) == NULL)
+				return 0;*/
+
+			char name[80];
+			strcpy(name, argv[3]);
+			strcat(name, ".gdb");
+			/* Waldo  Range - Xmin: -69.854694, Ymin: 44.202643, XMax: -68.792301, YMax: 44.754642
+			printf("\nX Min? ");
+			std::getline(std::cin, input);
+			//input << std::cin;*/
+			sscanf(argv[4], "%lf", &xmin);
+
+			printf("X Min = %f\n", xmin);
+
+			/*printf("\nY Min? ");
+			std::getline(std::cin, input);*/
+			sscanf(argv[5], "%lf", &ymin);
+			printf("Y Min = %f\n", ymin);
+
+			/*printf("\nX Max? ");
+			std::getline(std::cin, input);*/
+			sscanf(argv[6], "%lf", &xmax);
+			printf("X Max = %f\n", xmax);
+
+			/*printf("\nY Max? ");
+			std::getline(std::cin, input);*/
+			sscanf(argv[7], "%lf", &ymax);
+			printf("Y Max = %f\n", ymax);
+			TString tName(argv[3]);
+			error = tDB.dacCreate(tName, 1 << 16);
+			if ((error = tDB.Create(tName, xmin, ymin, xmax, ymax)) != 0)
+				return -1;
+
+			printf("Database %s created\n", name);
+
+			return 0;
+		}
+
 	  rt1Name = (const char *)&buffer[ 0 ];
 //		rt1Name += tigerExts[RT1_EXT];
 	  if( ( inFile1 = ::fopen( TString(rt1Name), "r" ) ) == NULL )
@@ -274,7 +338,7 @@ int main( int argc, char *argv[] )
 	  {
 		  fName = baseName + "Map.tab";
 		  mappingFile = ::fopen(TString(fName), "w");
-			error = tDB.dacCreate(TString(argv[3]), 1 << 16);
+			//error = tDB.dacCreate(TString(argv[3]), 1 << 16);
 			//error = dac.create(TString("C:\\Work\\Waldo2006.dac"), 1 << 16);
 			//short s;
 			//error = dac.open(TString("C:\\Work\\Waldo2006.dac"), 0, 1, &s);
@@ -562,17 +626,33 @@ NEXT_LINE :
 			 		line->SetCode( cCode );
 					line->SetName( names, nNames );
 					line->SetTLID(rec1.tlid);
-					line->write();
+					if( (error = line->write()) != 0)
+					{
+						fprintf(stderr, "**line->write() failed\n");
+						goto CLEAN_UP;
+					}
 					fprintf(mappingFile, "%ld\t%ld\n", rec1.tlid, line->dbAddress() );
 	//#endif
 					fflush( stdout );
-					error = tDB.dacInsert(line, line);
+					if ((error = tDB.dacInsert(line, line)) != 0)
+					{
+						fprintf(stderr, "**tDB.dacInsert() failed\n");
+						goto CLEAN_UP;
+					}
 					//error = dac.insert(line, line);
 					dbo.Unlock();
 			
-					error = tDB.Add( dbo );
+					if ((error = tDB.Add( dbo )) != 0)
+					{
+						fprintf(stderr, "**tDB.Add() failed\n");
+						goto CLEAN_UP;
+					}
 					tDB.TrBegin();
-					error = tDB.TrEnd();
+					if ((error = tDB.TrEnd()) != 0)
+					{
+						fprintf(stderr, "**tDB.TrEnd() failed\n");
+						goto CLEAN_UP;
+					}
 					//error = dac.trend();
 #endif
 				}
@@ -743,7 +823,33 @@ NEXT_LINE :
 				count++;
 				//DoGTpoly(csvFile, recI);
 			}
+			//
+			//	Process record "P" - 
+			//
+			rt1Name = rootName + tigerExts[RTP_EXT];
+			if ((inFile1 = fopen(rt1Name, "r")) == 0)
+			{
+				printf("Cannot open %s\n", (const char*)rt1Name);
+				goto ERR_RETURN;
+			}
+			struct GeoPoint
+			{
+				long lat,
+					lon;
+			};
+			std::map<std::string, GeoPoint> centroidMap;
+			TigerRecP recP;
+			while (recP.GetNextRec(inFile1) > 0)
+			{
+				GeoPoint gp;
+				gp.lat = recP.polyLat;
+				gp.lon = recP.polyLong;
+				std::string s = recP.cenid + std::to_string(recP.polyid);
 
+				centroidMap.insert({ s, gp });
+				printf("PolyID: %d, Lat: %d, Long: %d\n", recP.polyid, recP.polyLat, recP.polyLong);
+			}
+			::fclose(inFile1);
 //
 //	Process record "7" - Landmark links
 //
@@ -754,17 +860,12 @@ NEXT_LINE :
 				goto ERR_RETURN;
 			}
 
-			struct DirLineId
-			{
-				long tlid;
-				signed char dir;
-			};
-
+			int nPolysFound = 0;
 			// Process Landmark polygons
 			TigerRec7 rec7;
 			while (rec7.GetNextRec(inFile1) > 0)
 			{
-				std::vector<DirLineId> dirLineIds;
+				std::vector<TigerDB::DirLineId> dirLineIds;
 				if (rec7.lalong != -1 || rec7.lalat != -1)  // Point Landmarks
 					continue;
 				if (rec7.cfcc[0] != 'H')  // Temporary
@@ -778,7 +879,7 @@ NEXT_LINE :
 				LMLink ll = it->second;
 				for (std::vector<GTPoly>::iterator it2 = gtPolys.begin(); it2 != gtPolys.end(); ++it2)
 				{
-					DirLineId dl;
+					TigerDB::DirLineId dl;
 					if (strcmp(it2->cenidl, ll.cenid) == 0 && it2->polyidl == ll.polyid)
 					{
 						dl.tlid = it2->tlid;
@@ -794,9 +895,9 @@ NEXT_LINE :
 						count++;
 					}
 				}
-				printf("Count = %ld\n", count);
+				/*printf("Count = %ld\n", count);
 				if (count == 1)
-					continue;
+					continue;*/
 				printf("Processing: %d, name: %s\n", rec7.land, rec7.laname);
 				int err;
 				struct PolySegment
@@ -804,15 +905,16 @@ NEXT_LINE :
 					double area;
 					Range2D mbr;
 					int start, end;
+					double xcg, ycg;
 				};
-				std::vector<DirLineId> orderedLines;
+				std::vector<TigerDB::DirLineId> orderedLines;
 				std::vector<PolySegment> polySegs;
 
 				int start = 0;
 				DbHash dbHash;
 				while (dirLineIds.size() > 0)
 				{
-					DirLineId dl = dirLineIds[0];
+					TigerDB::DirLineId dl = dirLineIds[0];
 					orderedLines.push_back(dl);
 					dirLineIds[0] = dirLineIds.back();// [dirLineIds.size() - 1] ;
 					dirLineIds.pop_back();
@@ -921,6 +1023,15 @@ NEXT_LINE :
 						rval = -rval;
 					ps.area = rval;
 					ps.mbr = mbr;
+					{
+						double areai = 1.0 / rval;
+						if ((xcg = (xcg * areai + xcom) * (1.0 / 3.0)) <= 0.0)
+							/*fprintf(stderr, "Centroid X: %lf\n", xcg)*/;
+						if ((ycg = (ycg * areai + ycom) * (1.0 / 3.0)) <= 0.0)
+							/*fprintf(stderr, "Centroid Y: %lf\n", ycg)*/;
+					}
+					ps.ycg = (ycg/* + 0.5*/);
+					ps.xcg = (xcg/* + 0.5*/);
 					ps.start = start;
 					ps.end = orderedLines.size();
 					start += nSegs;
@@ -935,7 +1046,7 @@ NEXT_LINE :
 					}
 				};
 
-				std::sort(polySegs.begin(), polySegs.end(), greater_than_key());
+				std::sort(polySegs.begin(), polySegs.end(), greater_than_key());  // Put the largest polygon first
 				/*//int last = 0;
 				for (int i = 0; i < polySegs.size(); i++)
 				{
@@ -951,6 +1062,39 @@ NEXT_LINE :
 
 					if (j == 0)
 					{
+						// Search and see if we find the matching polygon already constructed
+						ObjHandle so;
+						GeoDB::Search ss;
+
+						XY_t centroid;
+						centroid.x = ps.xcg;
+						centroid.y = ps.ycg;
+
+						Range2D range;
+						range.Envelope(centroid);
+
+						tDB.Init(/*range*/ps.mbr, &ss);
+						while (tDB.GetNext(&ss, &so) == 0)
+						{
+							GeoDB::SpatialObj* spatialObj = (GeoDB::SpatialObj*)so.Lock();
+							GeoDB::SpatialClass sc = spatialObj->IsA();
+							if (sc == GeoDB::AREA)
+							{
+								nPolysFound++;
+								//int nPts = TigerDB::Polygon::GetPts(so, points);
+								TigerDB::Polygon* poly = (TigerDB::Polygon*)spatialObj;
+								//printf("Poly: %ld with classification: %d", spatialObj->dbAddress(), poly->GetCode());
+								int match = poly->matchPoly(so, orderedLines, ps.start, ps.end);
+								if (match > 0)
+								//if (isPolygonMatch(so, orderedLines, ps.start, ps.end))
+								{
+									printf("* Poly: %ld matches %s (%d)\n", poly->dbAddress(), rec7.laname, match);
+								}
+								//printf("\n");
+							}
+							so.Unlock();
+						}
+						break; // Don't create the Polygon now
 						if ((err = tDB.NewObject(DB_TIGER_POLY, po)) != 0)
 						{
 							fprintf(stderr, "**dbOM.newObject failed\n");
@@ -968,11 +1112,11 @@ NEXT_LINE :
 					for (int i = ps.end; --i >= ps.start; )
 						//	for (int i = 0; i < lineCount; i++)
 					{
-						DirLineId& lineId = orderedLines[i];
+						TigerDB::DirLineId& lineId = orderedLines[i];
 						dbHash.tlid = lineId.tlid;
 						ObjHandle eh;
 						err = tDB.dacSearch(DB_TIGER_LINE, &dbHash, eh);
-						if (j > 0)
+						if (j > 0)  // Changing direction of edge in an island
 							lineId.dir = -lineId.dir;
 						err = poly->AddEdge(eh, lineId.dir);
 					}
@@ -989,6 +1133,7 @@ NEXT_LINE :
 
 				//DoLMarea(csvFile, rec7);
 			}
+			printf("Number of Hydro polygons found: %d\n", nPolysFound);
 /*
 			rt1Name = rootName + tigerExts[RTI_EXT];
 //	    rt1Name.SetAt( length - 1, 'i' );
@@ -1938,3 +2083,31 @@ static double CalcArea(XY_t pts[], int nPts,
 
 	return(area);
 }
+/*
+static bool isPolygonMatch(ObjHandle &poly, std::vector<DirLineId> &polyLines, int start, int end)
+{
+	int err;
+	ObjHandle epl = poly;
+	int total = 0,
+		nFound = 0;
+	while ((err = POLY_EDGE.getNext(epl)) == 0)
+	{
+		ObjHandle eo = epl;
+		err = EDGE_POLY.getNext(eo);
+		TigerDB::Chain* edge = (TigerDB::Chain*)eo.Lock();
+		long tlid = edge->GetTLID();
+		eo.Unlock();
+
+		for (int i = end; --i >= start; )
+		{
+			DirLineId& lineId = polyLines[i];
+			if (tlid == lineId.tlid)
+				nFound++;
+		}
+		total++;
+	}
+
+	return (nFound > total / 2);
+//	return false;
+}
+*/

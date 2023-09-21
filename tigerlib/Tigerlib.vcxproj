@@ -235,6 +235,7 @@
     <ClCompile Include="tigerrt8.cpp" />
     <ClCompile Include="tigerrtH.cpp" />
     <ClCompile Include="tigerrti.cpp" />
+    <ClCompile Include="TigerrtP.cpp" />
     <ClCompile Include="tigerRtZ.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -248,6 +249,7 @@
     <ClInclude Include="tigerrt8.h" />
     <ClInclude Include="tigerrtH.h" />
     <ClInclude Include="tigerrtI.h" />
+    <ClInclude Include="tigerrtP.h" />
     <ClInclude Include="tigerRtZ.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

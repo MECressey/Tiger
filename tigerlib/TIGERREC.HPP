@@ -15,5 +15,6 @@
 #include "tigerrti.h"
 #include "tigerrtH.h"
 #include "tigerrtZ.h"
+#include "tigerrtP.h"
 
 #endif

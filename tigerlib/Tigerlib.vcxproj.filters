@@ -47,6 +47,9 @@
     <ClCompile Include="tigerRtZ.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="TigerrtP.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="tigerlib.h">
@@ -80,6 +83,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="tigerRtZ.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tigerrtP.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
