@@ -831,12 +831,12 @@ FOUND_ONE :
 				// Creating a polygon.  ISLANDS are coming out polygon - FIX LATER!!!
 				ObjHandle po;
 				int err;
-				if ((err = tDB.NewObject(DB_TIGER_POLY, po/*, id*/)) != 0)
+				if ((err = tDB.NewObject(DB_POLY/*DB_TIGER_POLY*/, po/*, id*/)) != 0)
 				{
 					fprintf(stderr, "**dbOM.newObject failed\n");
 				}
 
-				TigerDB::Polygon* poly = (TigerDB::Polygon*)po.Lock();
+				GeoDB::Poly* poly = (GeoDB::Poly*)po.Lock();
 
 				poly->SetCode(TigerDB::HYDRO_PerennialLakeOrPond);
 				poly->SetArea(-rval);
@@ -847,9 +847,9 @@ FOUND_ONE :
 				range.x.max = -69.2134;*/
 				poly->SetMBR(mbr);
 
-				poly->write();
+				err = poly->write();
 				//po.Unlock();
-				tDB.Add(po);
+				err = tDB.Add(po);
 
 				for (int i = lineCount; --i >= 0;)
 				//	for (int i = 0; i < lineCount; i++)

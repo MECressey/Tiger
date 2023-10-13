@@ -114,7 +114,7 @@ static const TCHAR *tigerExts[] =
 class DbHash : public DbHashAccess {
 public:
 	long tlid;
-	int is_equal(DbObject* dbo) { return this->tlid == ((TigerDB::Chain*)dbo)->GetTLID(); }
+	int is_equal(DbObject* dbo) { return this->tlid == ((TigerDB::Chain*)dbo)->userId/*GetTLID()*/; }
 	long int hashKey(int nBits) { return HashTable::HashDK(nBits, tlid); }
 };
 
@@ -611,7 +611,7 @@ NEXT_LINE :
 #ifdef TO_TIGERDB
 					ObjHandle dbo;
 
-					if( ( error = tDB.NewObject( DB_TIGER_LINE, dbo/*, id*/ ) ) != 0 )
+					if( ( error = tDB.NewObject( DB_GEO_LINE/*DB_TIGER_LINE*/, dbo/*, id*/)) != 0)
 					{
 						fprintf( stderr,  "**dbOM.newObject failed\n" );
 						goto CLEAN_UP;
@@ -620,17 +620,33 @@ NEXT_LINE :
 					TigerDB::Chain *line = (TigerDB::Chain *)dbo.Lock();
 
 					line->Init();
+					line->line_coor.init();
 
-			 		line->Set( (unsigned)nPoints, points );
+/*					if ((error = line->Set((unsigned)nPoints, points)) != 0)
+					{
+						fprintf(stderr, "**line->Set() failed\n");
+						goto CLEAN_UP;
+					}*/
 	//			 	line->Set( id );
+/**/					Range2D box;
+					box.Init();
+					for (unsigned i = 0; i < nPoints; i++)
+					{
+						box.Add(points[i]);
+					}
+
+					line->SetMBR(box);
+/**/
 			 		line->SetCode( cCode );
 					line->SetName( names, nNames );
-					line->SetTLID(rec1.tlid);
+					//line->SetTLID(rec1.tlid);
+					line->userId = rec1.tlid;
 					if( (error = line->write()) != 0)
 					{
 						fprintf(stderr, "**line->write() failed\n");
 						goto CLEAN_UP;
 					}
+//					line->Set((unsigned)nPoints, points);
 					fprintf(mappingFile, "%ld\t%ld\n", rec1.tlid, line->dbAddress() );
 	//#endif
 					fflush( stdout );
@@ -647,6 +663,7 @@ NEXT_LINE :
 						fprintf(stderr, "**tDB.Add() failed\n");
 						goto CLEAN_UP;
 					}
+					error = line->Set((unsigned)nPoints, points);
 					tDB.TrBegin();
 					if ((error = tDB.TrEnd()) != 0)
 					{

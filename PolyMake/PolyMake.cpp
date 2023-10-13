@@ -23,7 +23,7 @@
 class DbHash : public DbHashAccess {
 public:
 	long tlid;
-	int is_equal(DbObject* dbo) { return this->tlid == ((TigerDB::Chain*)dbo)->GetTLID(); }
+	int is_equal(DbObject* dbo) { return this->tlid == ((TigerDB::Chain*)dbo)->userId/*GetTLID()*/; }
 	long int hashKey(int nBits) { return HashTable::HashDK(nBits, tlid); }
 };
 
@@ -129,7 +129,7 @@ int FillTopoTables(
 	NodeTable* nTable
 )
 {
-	long tlid = line->GetTLID();
+	long tlid = line->userId/*GetTLID()*/;
 	PolyNode* node;
 	double angle;
 	GeoLine* newLine;
@@ -216,7 +216,7 @@ int FillPolyTables(
 			ObjHandle oh;
 			DbHash dbHash;
 			dbHash.tlid = tlid;
-			int err = db.dacSearch(DB_TIGER_LINE, &dbHash, oh);
+			int err = db.dacSearch(DB_GEO_LINE/*DB_TIGER_LINE*/, &dbHash, oh);
 
 			if (err != 0)
 			//std::map<int, int>::iterator it = tlidMap.find(tlid);
@@ -274,7 +274,7 @@ int AddClosureLines(
 		ObjHandle oh;
 		int err = db.Read(it->second, oh);
 		TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
-		assert(it->first == line->GetTLID());
+		assert(it->first == line->userId/*GetTLID()*/);
 		if (line->GetCode() == TigerDB::NVF_USGSClosureLine)
 		{
 			int i;
@@ -341,7 +341,8 @@ int main(int argc, char* argv[])
 			ObjHandle oh;
 			DbHash dbHash;
 			dbHash.tlid = tlid;
-			err = tDB.dacSearch(5, &dbHash, oh);
+			err = tDB.dacSearch(DB_GEO_LINE, &dbHash, oh);
+			assert(err == 0);
 			TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
 			int rec = line->dbAddress();
 			assert(rec == recPtr);
