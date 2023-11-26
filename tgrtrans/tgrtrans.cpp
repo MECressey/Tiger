@@ -36,7 +36,7 @@
 #include <algorithm>
 #include <assert.h>
 #include "HASHTABL.HPP"
-
+#include "TopoTools.h"
 #include "TString.h"
 
 #define TO_TIGERDB
@@ -121,7 +121,8 @@ public:
 int main( int argc, char *argv[] )
 {
   char buffer[512];
-  long nLines = 0;
+  long nLines = 0,
+		   nLinesSkipped = 0;
   CString rt1Name,
   				baseName,
   			  fName;
@@ -152,7 +153,8 @@ int main( int argc, char *argv[] )
 		   doGTpoly = true,
 		   doHistory = true,
 		   doZips	= false,
-			 doTigerDB = true/*false*/;
+			 doTigerDB = true/*false*/,
+			 doTopo = false;
   int version = 0;
 	int error;
 	double tlFilter = 0.0001;
@@ -169,7 +171,7 @@ int main( int argc, char *argv[] )
 
 		if( argc > 2 && ( argv[ 2 ][ 0 ] == '/' || argv[ 2 ][ 0 ] == '-' ) )
 		{
-			doHistory = doGTpoly = doLines = doNames = doBlocks = doPolys = doAddress = doCreate = false;
+			doHistory = doGTpoly = doLines = doNames = doBlocks = doPolys = doAddress = doCreate = doTopo = false;
 			int i = 1;
 			while( argv[2][i] != '\0' )
 			{
@@ -219,6 +221,11 @@ int main( int argc, char *argv[] )
 			    doNames = true;
 					break;
 
+				case 'T':
+				case 't':
+					doTopo = true;
+					break;
+
 			  case 'Z' :
 			  case 'z' :
 			    doZips = true;
@@ -234,7 +241,7 @@ int main( int argc, char *argv[] )
 		CDatabase db;
 		db.SetQueryTimeout(60 * 10);
 		db.Open( _T("TigerBase"), FALSE, TRUE, _T("ODBC;"), FALSE );
-		db.SetSynchronousMode(TRUE);
+//		db.SetSynchronousMode(TRUE);
 #ifdef TO_TIGERDB
 		TigerDB tDB(&db);
 		//DAC dac;
@@ -295,6 +302,20 @@ int main( int argc, char *argv[] )
 
 			printf("Database %s created\n", name);
 
+			return 0;
+		}
+
+		if (doTopo)
+		{
+			if (doTigerDB && (error = tDB.Open(TString(argv[3]), 1)) != 0)
+			{
+				fprintf(stderr, "* Cannot open Tiger DB: %s\n", argv[3]);
+				goto CLEAN_UP;
+			}
+
+			const Range2D range = tDB.GetRange();
+			int err = TopoTools::BuildTopology(tDB, range);
+			err = tDB.Close();
 			return 0;
 		}
 
@@ -464,12 +485,16 @@ NEXT_LINE :
 //	1) If line is a border
 //	2) If line defines a census block
 //	3) If line is a road, water or political boundary
-				if( ! ((rec1.blkl != rec1.blkr || rec1.blkls != rec1.blkrs ||
-							 rec1.ctbnal != rec1.ctbnar || rec1.countyl != rec1.countyr ||
-							 rec1.statel != rec1.stater) ||
-							(rec1.side != '\0') ||
-							(rec1.cfcc[0] == 'A' || rec1.cfcc[0] == 'B' || rec1.cfcc[0] == 'F' || rec1.cfcc[0] == 'H') ))
+				if (!((rec1.blkl != rec1.blkr || rec1.blkls != rec1.blkrs ||
+					rec1.ctbnal != rec1.ctbnar || rec1.countyl != rec1.countyr ||
+					rec1.statel != rec1.stater) ||
+					(rec1.side != '\0') ||
+					(rec1.cfcc[0] == 'A' || rec1.cfcc[0] == 'B' || rec1.cfcc[0] == 'F' || rec1.cfcc[0] == 'H')))
+				{
+					nLinesSkipped++;
 					continue;
+				}
+
 
 				TigerDB::Name names[5];
 				int nNames = 0;
@@ -637,7 +662,8 @@ NEXT_LINE :
 
 					line->SetMBR(box);
 /**/
-			 		line->SetCode( cCode );
+					line->userCode = cCode;
+			 		//line->SetCode( cCode );
 					line->SetName( names, nNames );
 					//line->SetTLID(rec1.tlid);
 					line->userId = rec1.tlid;
@@ -703,7 +729,7 @@ NEXT_LINE :
 	    if( index != 0 )
 	      delete [] index;
 
-	    printf( "\nNumber of lines: %ld%\n", nLines );
+	    printf( "\nNumber of lines proccessed: %ld, skipped: %ld\n", nLines, nLinesSkipped );
 
 	    if( csvLines ) fclose( csvLines );
 	    if( csvBlocks ) fclose( csvBlocks );
@@ -882,7 +908,7 @@ NEXT_LINE :
 			TigerRec7 rec7;
 			while (rec7.GetNextRec(inFile1) > 0)
 			{
-				std::vector<TigerDB::DirLineId> dirLineIds;
+				std::vector<GeoDB::DirLineId> dirLineIds;
 				if (rec7.lalong != -1 || rec7.lalat != -1)  // Point Landmarks
 					continue;
 				if (rec7.cfcc[0] != 'H')  // Temporary
@@ -896,17 +922,17 @@ NEXT_LINE :
 				LMLink ll = it->second;
 				for (std::vector<GTPoly>::iterator it2 = gtPolys.begin(); it2 != gtPolys.end(); ++it2)
 				{
-					TigerDB::DirLineId dl;
+					GeoDB::DirLineId dl;
 					if (strcmp(it2->cenidl, ll.cenid) == 0 && it2->polyidl == ll.polyid)
 					{
-						dl.tlid = it2->tlid;
+						dl.id = it2->tlid;
 						dl.dir = -1;
 						dirLineIds.push_back(dl);
 						count++;
 					}
 					else if (strcmp(it2->cenidr, ll.cenid) == 0 && it2->polyidr == ll.polyid)
 					{
-						dl.tlid = it2->tlid;
+						dl.id = it2->tlid;
 						dl.dir = 1;
 						dirLineIds.push_back(dl);
 						count++;
@@ -924,14 +950,14 @@ NEXT_LINE :
 					int start, end;
 					double xcg, ycg;
 				};
-				std::vector<TigerDB::DirLineId> orderedLines;
+				std::vector<GeoDB::DirLineId> orderedLines;
 				std::vector<PolySegment> polySegs;
 
 				int start = 0;
 				DbHash dbHash;
 				while (dirLineIds.size() > 0)
 				{
-					TigerDB::DirLineId dl = dirLineIds[0];
+					GeoDB::DirLineId dl = dirLineIds[0];
 					orderedLines.push_back(dl);
 					dirLineIds[0] = dirLineIds.back();// [dirLineIds.size() - 1] ;
 					dirLineIds.pop_back();
@@ -942,8 +968,9 @@ NEXT_LINE :
 						ePt;
 					ObjHandle oh;
 
-					dbHash.tlid = dl.tlid;
-					err = tDB.dacSearch(DB_TIGER_LINE, &dbHash, oh);
+					dbHash.tlid = dl.id;
+					err = tDB.dacSearch(DB_GEO_LINE, &dbHash, oh);
+					assert(err == 0);
 					TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
 					Range2D mbr;
 					mbr = line->GetMBR();
@@ -984,7 +1011,7 @@ NEXT_LINE :
 						for (i = 0; i < dirLineIds.size(); i++)
 						{
 							dl = dirLineIds[i];
-							dbHash.tlid = dl.tlid;
+							dbHash.tlid = dl.id;
 							err = tDB.dacSearch(DB_TIGER_LINE, &dbHash, oh);
 							TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
 							XY_t sNode, eNode;
@@ -1071,7 +1098,7 @@ NEXT_LINE :
 					//last = polySegs[i].end;
 				}*/
 				ObjHandle po;
-				TigerDB::Polygon* poly = 0;
+				GeoDB::Poly* poly = 0;
 				for (int j = 0; j < polySegs.size(); j++)
 				{
 					PolySegment ps = polySegs[j];
@@ -1099,7 +1126,7 @@ NEXT_LINE :
 							{
 								nPolysFound++;
 								//int nPts = TigerDB::Polygon::GetPts(so, points);
-								TigerDB::Polygon* poly = (TigerDB::Polygon*)spatialObj;
+								GeoDB::Poly* poly = (GeoDB::Poly*)spatialObj;
 								//printf("Poly: %ld with classification: %d", spatialObj->dbAddress(), poly->GetCode());
 								int match = poly->matchPoly(so, orderedLines, ps.start, ps.end);
 								if (match > 0)
@@ -1112,12 +1139,12 @@ NEXT_LINE :
 							so.Unlock();
 						}
 						break; // Don't create the Polygon now
-						if ((err = tDB.NewObject(DB_TIGER_POLY, po)) != 0)
+						if ((err = tDB.NewObject(GeoDB::DB_POLY, po)) != 0)
 						{
 							fprintf(stderr, "**dbOM.newObject failed\n");
 						}
 
-						poly = (TigerDB::Polygon*)po.Lock();
+						poly = (GeoDB::Poly*)po.Lock();
 						poly->SetCode(MapCFCC(rec7.cfcc));
 						poly->SetArea(ps.area);
 						poly->SetMBR(ps.mbr);
@@ -1129,10 +1156,11 @@ NEXT_LINE :
 					for (int i = ps.end; --i >= ps.start; )
 						//	for (int i = 0; i < lineCount; i++)
 					{
-						TigerDB::DirLineId& lineId = orderedLines[i];
-						dbHash.tlid = lineId.tlid;
+						GeoDB::DirLineId& lineId = orderedLines[i];
+						dbHash.tlid = lineId.id;
 						ObjHandle eh;
-						err = tDB.dacSearch(DB_TIGER_LINE, &dbHash, eh);
+						err = tDB.dacSearch(DB_GEO_LINE, &dbHash, eh);
+						assert(err == 0);
 						if (j > 0)  // Changing direction of edge in an island
 							lineId.dir = -lineId.dir;
 						err = poly->AddEdge(eh, lineId.dir);

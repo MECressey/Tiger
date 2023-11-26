@@ -81,5 +81,6 @@
     <Library Include="..\..\Lib2\SetsDLL.lib" />
     <Library Include="..\..\Lib2\CxxToolsLib.lib" />
     <Library Include="..\..\Lib2\TigerDBDLL.lib" />
+    <Library Include="..\..\Lib2\TopoToolsDLL.lib" />
   </ItemGroup>
 </Project>

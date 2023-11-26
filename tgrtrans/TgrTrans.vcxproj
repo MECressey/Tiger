@@ -248,6 +248,7 @@
     <Library Include="..\..\Lib2\GeoToolsDLL.lib" />
     <Library Include="..\..\Lib2\SetsDLL.lib" />
     <Library Include="..\..\Lib2\TigerDBDLL.lib" />
+    <Library Include="..\..\Lib2\TopoToolsDLL.lib" />
     <Library Include="..\tigerlib\Debug\Tigerlib.lib" />
   </ItemGroup>
   <ItemGroup>

@@ -20,7 +20,7 @@
 //#define NEW_STUFF
 //#define TEST_HYDRO
 
-static CArray<DirLineId,DirLineId &> polyIds;
+static CArray<GeoDB::DirLineId, GeoDB::DirLineId &> polyIds;
 
 inline void DoCalc(
   const XY_t &pt,
@@ -94,6 +94,82 @@ static double CalcArea( GeoLine *line/*GEOPOINT pts[], int nPts*/,
   }
 
   return( area );
+}
+
+static int maxPts = 0;
+static XY_t *points = 0;
+
+static double CalcArea(GeoDB::Line *line,
+	const double& xcom, const double& ycom, double* xcg, double* ycg, int dir)
+{
+	double area = 0.0;
+	XY_t sNode,
+		eNode;
+	int nPts = line->GetNumPts();
+
+	line->GetNodes(&sNode, &eNode);
+
+	if (nPts > 2)
+	{
+		if (nPts > maxPts)
+		{
+			if (points != 0)
+				delete[] points;
+			maxPts = nPts;
+			points = new XY_t[maxPts];
+		}
+		line->Get(points);
+	}
+
+	if (dir > 0)
+	{
+		double xold = sNode.x,
+					 yold = sNode.y;
+
+		if (nPts > 2)
+		{
+			for (int i = 1; i < nPts; i++)
+			{
+				double x = points[i].x,
+							 y = points[i].y,
+							 aretri = (xcom - x) * (yold - ycom) + (xold - xcom) * (y - ycom);
+
+				*xcg += aretri * (x + xold);
+				*ycg += aretri * (y + yold);
+				area += aretri;
+				xold = x;
+				yold = y;
+			}
+		}
+		else
+			DoCalc(eNode, xcom, ycom, xold, yold, xcg, ycg, area);
+	}
+	else
+	{
+		//	--nPts;
+		double xold = eNode.x,
+					 yold = eNode.y;
+
+		if (nPts > 2)
+		{
+			for (int i = nPts - 1; --i >= 0; )
+			{
+				double x = points[i].x,
+							 y = points[i].y,
+							 aretri = (xcom - x) * (yold - ycom) + (xold - xcom) * (y - ycom);
+
+				*xcg += aretri * (x + xold);
+				*ycg += aretri * (y + yold);
+				area += aretri;
+				xold = x;
+				yold = y;
+			}
+		}
+		else
+			DoCalc(sNode, xcom, ycom, xold, yold, xcg, ycg, area);
+	}
+
+	return(area);
 }
 
 void WritePolygon(
@@ -176,7 +252,7 @@ void WritePolygon(
 
 const int POLY_INC = 3;
 
-void WritePolyLine(FILE* file, long polyId, DirLineId polyIds[], int nIds, BOOL forward = TRUE)
+void WritePolyLine(FILE* file, long polyId, GeoDB::DirLineId polyIds[], int nIds, BOOL forward = TRUE)
 {
 	char buffer[256];
 	int pos = sprintf(buffer, "%ld\t", polyId);
@@ -186,7 +262,7 @@ void WritePolyLine(FILE* file, long polyId, DirLineId polyIds[], int nIds, BOOL 
 	{
 		for (int i = 0; i < nIds; i++)
 		{
-			const DirLineId& lineId = polyIds[i];
+			const GeoDB::DirLineId& lineId = polyIds[i];
 			int count = pos,
 				ii;
 			long tlid = lineId.id;
@@ -222,7 +298,7 @@ void WritePolyLine(FILE* file, long polyId, DirLineId polyIds[], int nIds, BOOL 
 	{
 		for (int i = nIds; --i >= 0; )
 		{
-			const DirLineId& lineId = polyIds[i];
+			const GeoDB::DirLineId& lineId = polyIds[i];
 			int count = pos,
 				ii;
 			long tlid = lineId.id;
@@ -264,7 +340,7 @@ int BuildPoly2(
   const char *polyName,
   unsigned polyDfcc,
   long polyId,
-  CArray<DirLineId, DirLineId &> &lineIds,
+  CArray<GeoDB::DirLineId, GeoDB::DirLineId &> &lineIds,
   int nLines,
   LineTable &lTable,
   NodeTable &nTable,
@@ -286,7 +362,7 @@ int BuildPoly2(
   FILE *polyFile = 0,
   	   *pLineFile = 0;
   char state[ 20 ];
-	DirLineId lid;
+	GeoDB::DirLineId lid;
 
 /*sprintf( state, "%d.csv", stateCode );*/
 
@@ -300,27 +376,28 @@ int BuildPoly2(
 		  polyIds.SetSize( 1000, 500 );
 
 /*		fname += (const char *)&state[ 0 ];*/
-
+/*
 		if( ( polyFile = fopen( TString(fname), "a+" ) ) == 0 )
 		{
 		  fprintf( stderr, "* BuildPoly2: cannot open file: %s\n", (const char *)TString(fname) );
 		  nLines = -1;
 		  goto ERR_RETURN;
 		}
-
+*/
 		fname = name;
 		fname += "pline.tab";
 /*
 		fname = "pline";
 		fname += (const char *)&state[ 0 ];
 */
+/*
 		if( ( pLineFile = fopen( TString(fname), "a+")) == 0)
 		{
 		  fprintf( stderr, "* BuildPoly2: cannot open file: %s\n", (const char *)TString(fname) );
 		  nLines = -1;
 		  goto ERR_RETURN;
 		}
-
+*/
 		while( nLines > 0 )
 		{
 	START_NEW_POLY :
@@ -340,7 +417,7 @@ int BuildPoly2(
 	//	find a line to start with
 		  for( i = 0; i < idCount; i++ )
 		  {
-				const DirLineId &temp = lineIds.GetAt( i );
+				const GeoDB::DirLineId &temp = lineIds.GetAt( i );
 
         if( ( lineId = temp.id/*lineIds.GetAt( i )*/ ) != 0 )
 				{
@@ -449,7 +526,7 @@ int BuildPoly2(
 
 				  for( i = 0; i < idCount; i++ )
 				  {
-						const DirLineId &temp = lineIds[ i ];
+						const GeoDB::DirLineId &temp = lineIds[ i ];
 
 				    if( ( lineId = temp.id/*lineIds[ i ]*/ ) == 0 ||
 				    			/*labs(*/ lineId /*)*/ != tlid )
@@ -529,7 +606,7 @@ FOUND_ONE :
 //	Backtrack if we have come to dead-end
 				  if( lineCount > 1 )
 				  {
-						const DirLineId &temp = polyIds[ --lineCount ];
+						const GeoDB::DirLineId &temp = polyIds[ --lineCount ];
 
 						backTracking = TRUE;
 						startId = temp.id/*polyIds[ --lineCount ]*/;
@@ -607,7 +684,7 @@ FOUND_ONE :
 				  fprintf( stderr, "* BuildPoly2: Could not find a matching line\n" );
 				  for( i = 0; i < lineCount; i++ )
 				  {
-						const DirLineId &temp = polyIds[ i ];
+						const GeoDB::DirLineId &temp = polyIds[ i ];
 
 				    fprintf( stderr, "Id:%ld ", temp.id/*polyIds[ i ]*/ ); 
 						if( ( i % 5 ) == 0 )
@@ -748,7 +825,7 @@ FOUND_ONE :
 		  for( i = 0; i < lineCount; i++ )
 		  {
 				long tlid;
-				const DirLineId &temp = polyIds[ i ];
+				const GeoDB::DirLineId &temp = polyIds[ i ];
 
 				tlid = temp.id/*polyIds[ i ]*/;
 
@@ -831,9 +908,9 @@ FOUND_ONE :
 				// Creating a polygon.  ISLANDS are coming out polygon - FIX LATER!!!
 				ObjHandle po;
 				int err;
-				if ((err = tDB.NewObject(DB_POLY/*DB_TIGER_POLY*/, po/*, id*/)) != 0)
+				if ((err = tDB.NewObject(GeoDB::DB_POLY/*DB_TIGER_POLY*/, po/*, id*/)) != 0)
 				{
-					fprintf(stderr, "**dbOM.newObject failed\n");
+					fprintf(stderr, "**BuildPoly2: dbOM.newObject failed\n");
 				}
 
 				GeoDB::Poly* poly = (GeoDB::Poly*)po.Lock();
@@ -854,7 +931,7 @@ FOUND_ONE :
 				for (int i = lineCount; --i >= 0;)
 				//	for (int i = 0; i < lineCount; i++)
 				{
-					const DirLineId& lineId = polyIds[i];
+					const GeoDB::DirLineId& lineId = polyIds[i];
 					long tlid = lineId.id;
 					int dir;
 
@@ -868,14 +945,22 @@ FOUND_ONE :
 					{
 						dir = 0;
 					}
-					err = tDB.Read(it->second, eh);
-					err = poly->AddEdge(eh, dir);
+					if ((err = tDB.Read(it->second, eh)) != 0)
+					{
+						fprintf(stderr, "**BuildPoly2: failed to find Line: %ld\n", it->second);
+					}
+					if ((err = poly->AddEdge(eh, dir)) != 0)
+					{
+						fprintf(stderr, "**BuildPoly2: failed to add Line: %ld to Poly: %ld\n", it->second, poly->dbAddress());
+					}
 				}
 				po.Unlock();
 
-				tDB.TrBegin();
-				tDB.TrEnd();
-
+				err = tDB.TrBegin();
+				if ((err = tDB.TrEnd()) != 0)
+				{
+					fprintf(stderr, "**BuildPoly2: TrEnd() failed: %ld\n", err);
+				}
 				if( islandName )
 				{
 				  rval *= 0.5;
@@ -918,4 +1003,427 @@ ERR_RETURN :
     fclose( polyFile );
 
   return( nPolys );
+}
+
+static int FindIdInList(
+	long lineId,
+	CArray<GeoDB::DirLineId, GeoDB::DirLineId&> &lineIds,
+	int nLines
+)
+{
+	for (int i = 0; i < nLines; i++)
+	{
+		const GeoDB::DirLineId& temp = lineIds[i];
+		if (temp.id == lineId)
+			return i;
+	}
+	return -1;
+}
+
+int BuildPoly3(
+	TigerDB& tDB,
+	//std::map<int, int>& tlidMap,
+	const char* polyName,
+	unsigned polyDfcc,
+	long polyId,
+	CArray<GeoDB::DirLineId, GeoDB::DirLineId&> &lineIds,
+	int nLines,
+	//LineTable& lTable,
+	//NodeTable& nTable,
+	int stateCode,
+	const char* name,
+	long* newId,
+	int extraIds,
+	const char* islandName,
+	int startCode,
+	int isleDfcc,
+	BOOL checkDir
+)
+{
+	int nPolys = 0,
+		nWater = 0,
+		nIslands = 0,
+		i;
+	int idCount = nLines;
+	char state[20];
+	GeoDB::DirLineId lid;
+
+	try
+	{
+		if (polyIds.GetSize() == 0)
+			polyIds.SetSize(1000, 500);
+
+		while (nLines > 0)
+		{
+		START_NEW_POLY:
+			DbHash dbHash;
+			ObjHandle nh;
+			BOOL allWater = TRUE;
+			int lineCount = 0;
+			long lineId = 0;
+			int side = 0;
+			XY_t sPt,
+				ePt;
+			long startId = 0;
+			int lastCode = 0;
+			//GeoLine* currLine = 0;
+			//PolyNode* node = 0;
+			BOOL backTracking = FALSE;
+			XY_t prevPt;
+			DbObject::Id lastId = 0;
+			char lastDir = 0;
+			int err;
+			Range2D mbr;
+
+			//	find a line to start with
+			for (i = 0; i < idCount; i++)
+			{
+				const GeoDB::DirLineId& temp = lineIds.GetAt(i);
+
+				if ((lineId = temp.id) != 0)
+				{
+					startId = lineId;
+
+					ObjHandle oh;
+					dbHash.tlid = startId;
+					err = tDB.dacSearch(DB_GEO_LINE, &dbHash, oh);
+					if (err != 0)
+					{
+						fprintf(stderr, "* BuildPoly3: cannot find line: %ld\n", startId);
+						nPolys = -1;
+						goto ERR_RETURN;
+					}
+					TigerDB::Chain* currLine = (TigerDB::Chain * )oh.Lock();
+					lastId = currLine->dbAddress();
+					if ((lastCode = currLine->userCode) == startCode)  // ??? Doesn't make sense
+					{
+						oh.Unlock();
+						continue;
+					}
+#ifdef TEST_HYDRO
+					if (polyDfcc == OPEN_WATER)
+					{
+						if (lastDFCC != 111 && lastDFCC != 112)
+							continue;
+					}
+#endif
+					mbr.Envelope(currLine->GetMBR());  // Line could be a loop
+					lid = temp;
+					polyIds.SetAtGrow(lineCount++, lid);
+
+					if (temp.dir > 0)
+					{
+						currLine->GetNodes(&sPt, &ePt);
+						err = currLine->GetNode(nh, temp.dir);
+					}
+					else
+					{
+						currLine->GetNodes(&ePt, &sPt);
+						err = currLine->GetNode(nh, 0);
+					}
+					assert(err == 0);
+
+					//if( currLine->cfcc[ 0 ] != 'H' )
+					//  allWater = FALSE;
+
+					lid.id = 0;
+					lineIds.SetAt(i, lid);
+					oh.Unlock();
+					break;
+				}
+			}
+
+			if (i == idCount)
+			{
+				fprintf(stderr, "BuildPoly3: could not find a starting line\n");
+				if (startCode != 0)
+				{
+					break;
+				}
+
+				//				nPolys = -1;
+				goto ERR_RETURN;
+			}
+			--nLines;
+
+			//
+			//	Calculate area, centroid & MBR (assuming we will close)
+			//
+			double xcg = 0.0,
+							ycg = 0.0,
+							xcom = (double)sPt.x,
+							ycom = (double)sPt.y,
+							rval = 0.0;
+			//Range2D mbr;
+			//
+			//	Loop till the area closes
+			//
+			while (ePt != sPt)
+			{
+#if defined( NEW_STUFF )
+				START_OVER :
+#endif
+				int count = 0;
+//				double angle = ePt.Angle(prevPt);
+				int j;
+				int saveListPos;
+				//GeoLine* foundLine = 0;
+				//
+				//	Get all other lines sharing this end point
+				//
+				//GeoDB::Node * node = (GeoDB::Node*)nh.Lock();
+				ObjHandle eh;
+				GeoDB::dir_t outDir,
+					           saveDir;
+				const GeoDB::DirLineId& temp = polyIds[lineCount - 1];
+				double angle;
+				// Get the next directed edge out of the Node star
+				bool found = false;
+				saveListPos = -1;
+				int pos = -1,
+					  savePos = -1;
+				ObjHandle nextEdge;
+				ObjHandle nodeLink = nh;
+				while ((err = GeoDB::Node::GetNextDirectedEdge(nodeLink, eh, &outDir, &angle)) == 0)
+				{ 
+					pos += 1;
+					GeoDB::Line* line = (GeoDB::Line*)eh.Lock();
+					long id = line->userId;
+
+					if (id == temp.id)
+						found = true;
+					else
+					{
+						int foundPos = FindIdInList(id, lineIds, idCount);
+
+						if (foundPos >= 0)
+						{
+							if (saveListPos < 0 || line->userCode == TigerDB::HYDRO_PerennialShoreline)
+							{
+								saveListPos = foundPos;
+								saveDir = outDir;
+								savePos = pos;
+								nextEdge = eh;
+							}
+						}
+					}
+					eh.Unlock();
+				}
+
+				if (saveListPos < 0)
+				{
+					fprintf(stderr, "* BuildPoly3: cannot find next line: %ld in polygon in list\n", temp.id);
+					assert(saveListPos >= 0);
+				}
+				assert(found && saveListPos != -1);
+
+				//err = node->GetNextDirectedEdge(lastId, temp.dir > 0 ? temp.dir : 0, eh, &outDir);
+				//nh.Unlock();
+				TigerDB::Chain* edge = (TigerDB::Chain*)nextEdge.Lock();
+				XY_t startPt,
+						 endPt;
+				edge->GetNodes(&startPt, &endPt);
+				long userId = edge->userId;
+
+				if (saveDir > 0)
+					assert(endPt == ePt);
+				else
+					assert(startPt == ePt);
+/*
+				saveListPos = FindIdInList(userId, lineIds, idCount);
+				if (saveListPos < 0)
+				{
+					fprintf(stderr, "* BuildPoly3: cannot find line %d in list!\n", userId);
+					assert(saveListPos >= 0);
+				}
+*/
+				lid = lineIds[saveListPos];
+				if (lid.dir < 0)
+					lid.dir = 0;
+				assert(saveDir != lid.dir);
+				if (lid.dir > 0)
+					ePt = endPt;
+				else
+					ePt = startPt;
+				err = edge->GetNode(nh, lid.dir > 0 ? lid.dir : 0);
+				assert(err == 0);
+				lastId = edge->dbAddress();
+				mbr.Envelope(edge->GetMBR());
+				//GeoPoint::Envelope( &min, &max, currLine->min, currLine->max );
+
+				if (lid.dir <= 0)
+				{
+					rval += CalcArea(edge, xcom, ycom, & xcg, & ycg, -1);
+				}
+				else
+				{
+					rval += CalcArea(edge, xcom, ycom, &xcg, &ycg, 1);
+				}
+				nextEdge.Unlock();
+
+				polyIds.SetAtGrow(lineCount++, lid);
+				//			if( startId < 0 )
+				//			  startId = -startId;
+				lid.id = 0;
+				lineIds.SetAt(saveListPos, lid);
+				--nLines;
+			}
+#ifdef DO_LATER
+			if (allWater)
+			{
+				nWater++;
+			}
+#endif
+			//
+			//	Calculate final area & centroid
+			//
+			double areai = 1.0 / rval;
+			if ((xcg = (xcg * areai + xcom) * (1.0 / 3.0)) <= 0.0)
+				fprintf(stderr, "Centroid X: %lf\n", xcg);
+			if ((ycg = (ycg * areai + ycom) * (1.0 / 3.0)) <= 0.0)
+				fprintf(stderr, "Centroid Y: %lf\n", ycg);
+
+			XY_t centroid;
+
+			centroid.y = (ycg + 0.5);
+			centroid.x = (xcg + 0.5);
+			//
+			//	Positive area - right side is inside the polygon
+			//	Negative area - left side is inside the polygon
+			//
+#ifdef SAVE_FOR_NOW
+			if (rval > 0.0)
+			{
+				rval *= 0.5;
+				if (polyId > 0 && nPolys == 0)
+				{
+#if defined( _DEBUG )
+					fprintf(stderr, "Poly: %ld, # lines: %d\n", polyId, lineCount);
+#endif
+					/*
+										WritePolyLine(pLineFile, polyId, &polyIds[0], lineCount);
+										WritePolygon( polyFile, polyName, polyId, mbr, rval, stateCode, polyDfcc, centroid );
+					*/
+				}
+				else
+				{
+					if (polyId > 0)
+					{
+#if defined( _DEBUG )
+						fprintf(stderr, "Poly: %ld was created from %ld\n", *newId, polyId);
+#endif
+					}
+#if defined( _DEBUG )
+					fprintf(stderr, "Poly: %ld, # lines: %d\n", *newId, lineCount);
+#endif
+					/*
+										WritePolyLine( pLineFile, *newId, &polyIds[ 0 ], lineCount );
+										WritePolygon( polyFile, polyName, *newId, mbr, rval, stateCode, polyDfcc,
+												centroid );
+					*/
+					--(*newId);
+				}
+
+				nPolys++;
+			}
+			else
+#endif
+			{
+				nIslands++;
+				// Creating a polygon.  ISLANDS are coming out polygon - FIX LATER!!!
+				ObjHandle po;
+				int err;
+				if ((err = tDB.NewDbObject(GeoDB::DB_POLY, po/*, id*/)) != 0)
+				{
+					fprintf(stderr, "**BuildPoly3: dbOM.newObject failed\n");
+				}
+
+				GeoDB::Poly* poly = (GeoDB::Poly*)po.Lock();
+
+				poly->SetCode(TigerDB::HYDRO_PerennialLakeOrPond);
+				poly->SetArea(-rval);
+				poly->SetMBR(mbr);
+
+				//err = poly->write();
+				//po.Unlock();
+				err = tDB.Add(po);
+
+				for (int i = lineCount; --i >= 0;)
+					//	for (int i = 0; i < lineCount; i++)
+				{
+					const GeoDB::DirLineId& lineId = polyIds[i];
+					long tlid = lineId.id;
+					int dir;
+
+					ObjHandle eh;
+					dbHash.tlid = tlid;
+					err = tDB.dacSearch(DB_GEO_LINE, &dbHash, eh);
+					if (err != 0)
+					{
+						fprintf(stderr, "* BuildPoly3: cannot find line: %ld\n", startId);
+						nPolys = -1;
+						break;
+					}
+					//std::map<int, int>::iterator it = tlidMap.find(tlid);
+					if (lineId.dir > 0)
+					{
+						dir = 1;
+					}
+					else
+					{
+						dir = 0;
+					}
+					/*if ((err = tDB.Read(it->second, eh)) != 0)
+					{
+						fprintf(stderr, "**BuildPoly2: failed to find Line: %ld\n", it->second);
+					}*/
+					if ((err = poly->AddEdge(eh, dir)) != 0)
+					{
+						fprintf(stderr, "**BuildPoly3: failed to add Line: %ld to Poly: %ld\n", tlid, poly->dbAddress());
+					}
+				}
+				po.Unlock();
+
+				err = tDB.TrBegin();
+				if ((err = tDB.TrEnd()) != 0)
+				{
+					fprintf(stderr, "**BuildPoly3: TrEnd() failed: %ld\n", err);
+				}
+				if (islandName)
+				{
+					rval *= 0.5;
+#if defined( _DEBUG )
+					fprintf(stderr, "Isle: %ld, # lines: %d\n", *newId, lineCount);
+#endif
+					/*
+										WritePolyLine( pLineFile, *newId, &polyIds[ 0 ], lineCount, FALSE );
+										WritePolygon( polyFile, islandName, *newId, mbr, -rval, stateCode, isleDfcc, centroid );
+					*/
+					--(*newId);
+				}
+			}
+		}
+
+		fprintf(stderr, "Islands: %d, Water: %d\n", nIslands, nWater);
+	}
+	catch (CDBException* e)
+	{
+		//	THROW_LAST();
+		fprintf(stderr, "BuildPoly3: DBerr: %s\n", e->m_strError);
+		nPolys = -1;
+	}
+	catch (CMemoryException* e)
+	{
+		fprintf(stderr, "BuildPoly3: memory exception\n");
+		nPolys = -1;
+	}
+	catch (CException* e)
+	{
+		fprintf(stderr, "BuildPoly3: C exception\n");
+		nPolys = -1;
+	}
+
+ERR_RETURN:
+
+	return(nPolys);
 }

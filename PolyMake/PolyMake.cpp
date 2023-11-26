@@ -20,13 +20,6 @@
 
 //#ifdef SAVE_FOR_NOW
 
-class DbHash : public DbHashAccess {
-public:
-	long tlid;
-	int is_equal(DbObject* dbo) { return this->tlid == ((TigerDB::Chain*)dbo)->userId/*GetTLID()*/; }
-	long int hashKey(int nBits) { return HashTable::HashDK(nBits, tlid); }
-};
-
 static int BlkFind(const CString& blk)
 {
 	int pos;
@@ -46,7 +39,7 @@ static int BlkFind(const CString& blk)
 }
 
 int GetWaterLines(CDatabase& db, LPCTSTR blkTable, /*const char* lineTable,
-	const char* equivTable,*/ CArray<DirLineId, DirLineId&>& ids)
+	const char* equivTable,*/ CArray<GeoDB::DirLineId, GeoDB::DirLineId&>& ids)
 {
 	int nLines = 0;
 
@@ -93,7 +86,7 @@ int GetWaterLines(CDatabase& db, LPCTSTR blkTable, /*const char* lineTable,
 
 			if (side != 0)
 			{
-				DirLineId lineId;
+				GeoDB::DirLineId lineId;
 
 				lineId.id = blks.m_tlid;
 				lineId.dir = (signed char)side;
@@ -146,7 +139,7 @@ int FillTopoTables(
 	ASSERT(newLine != 0);
 
 	newLine->tlid = tlid;
-	newLine->dfcc = line->GetCode(); // .GetDFCC();
+	newLine->dfcc = line->userCode; // .GetDFCC();
 	//strcpy(newLine->cfcc, line.GetCFCC());
 	lTable->Link(newLine, tlid);
 	line->GetNodes(&newLine->sPt, &newLine->ePt);
@@ -196,12 +189,144 @@ int FillTopoTables(
 	return(0);
 }
 
+static int addNode(
+	TigerDB& db,
+	GeoDB::Line* line,
+	XY_t& nodePt,
+	double angle,
+	unsigned char dir,
+	NodeTable* nTable
+)
+{
+	unsigned long hashVal = nodePt.Hash();
+	PolyNode* pNode = (PolyNode*)nTable->Find(&nodePt, hashVal);
+	if (pNode != 0)
+	{
+		assert(pNode->pt == nodePt);
+	}
+
+	Range2D mbr;
+	mbr.Add(nodePt);
+	ObjHandle fo;
+	GeoDB::Search ss;
+	Range2D range = mbr;
+	range.ExtendXY(0.0001);
+	bool found = false;
+	db.Init(range, &ss);
+	while (db.GetNext(&ss, &fo) == 0)
+	{
+		GeoDB::SpatialObj* spatialObj = (GeoDB::SpatialObj*)fo.Lock();
+		GeoDB::SpatialClass sc = spatialObj->IsA();
+		if (sc == GeoDB::POINT)
+		{
+			GeoDB::Node* node = (GeoDB::Node*)spatialObj;
+			XY_t pt = node->GetPt();
+			fo.Unlock();
+			if (pt == nodePt)
+			{
+				found = true;
+				break;
+			}
+		}
+		fo.Unlock();
+	}
+
+	int err = 0;
+	ObjHandle no;
+	if (!found)
+	{
+		//assert(pNode == 0 || !(pNode->pt == nodePt) );
+
+		if ((err = db.NewObject(GeoDB::DB_NODE, no/*, id*/)) != 0)
+		{
+			fprintf(stderr, "**addNode: dbOM.newObject failed\n");
+		}
+
+		GeoDB::Node* node = (GeoDB::Node*)no.Lock();
+		node->Set(nodePt);
+		node->SetMBR(mbr);
+
+		if ((err = node->write()) == 0)
+			err = db.Add(no);
+		if (pNode != 0 && pNode->pt == nodePt)
+			fprintf(stderr, "* addNode: Node (%d) not found but but existed in hash table\n", node->dbAddress());
+		no.Unlock();
+		if (err != 0)
+			fprintf(stderr, "**addNode: write() or Add() failed: %d\n", err);
+	}
+	else
+	{
+		no = fo;
+		assert(pNode != 0);
+	}
+
+	GeoDB::Node* node = (GeoDB::Node*)no.Lock();
+	err = node->Insert(line, angle, dir);
+	no.Unlock();
+
+	if (pNode == 0)
+	{
+		pNode = new PolyNode(nodePt);
+		nTable->Link(pNode, hashVal);
+	}
+
+	return err;
+}
+
+int FillTopoTables2(
+	TigerDB &db,
+	GeoDB::Line* line,
+	LineTable* lTable,
+	NodeTable* nTable
+)
+{
+	long tlid = line->userId;
+	double angle;
+	
+	XY_t sPt,
+			 ePt;
+	XY_t *pts = 0;
+	line->GetNodes(&sPt, &ePt);
+	int nPts = line->GetNumPts();
+
+	if (nPts > 2)
+	{
+		pts = new XY_t[nPts];
+		line->Get(pts);
+	}
+
+	if (nPts > 2)
+		angle = sPt.Angle(pts[1]);
+	else
+		angle = sPt.Angle(ePt);
+
+	int err = addNode(db, line, sPt, angle, 0, nTable);
+	if (err != 0)
+		fprintf(stderr, "* addNode failed (%d) for line: %d\n", err, tlid);
+
+	if (nPts > 2)
+		angle = ePt.Angle((XY_t&)pts[nPts - 2]);
+	else
+		angle = ePt.Angle(sPt);
+
+	if ((err = addNode(db, line, ePt, angle, 1, nTable)) != 0)
+		fprintf(stderr, "* addNode failed (%d) for line: %d\n", err, tlid);
+
+	delete[] pts;
+	if (err == 0)
+	{
+		if ((err = db.TrBegin()) == 0)
+			err = db.TrEnd();
+	}
+	return err;
+}
+
 int FillPolyTables(
 	std::map<int, int> &tlidMap,
 	//DAC &dac,
 	TigerDB &db,
 	int nLines,
-	CArray<DirLineId, DirLineId&>& lineIds,
+	CArray<GeoDB::DirLineId, GeoDB::DirLineId&>& lineIds,
 	LineTable& lTable,
 	NodeTable& nTable
 )
@@ -210,7 +335,7 @@ int FillPolyTables(
 	{
 		for (int i = 0; i < nLines; i++)
 		{
-			const DirLineId& lid = lineIds.GetAt(i);
+			const GeoDB::DirLineId& lid = lineIds.GetAt(i);
 			long tlid = lid.id;
 
 			ObjHandle oh;
@@ -223,7 +348,7 @@ int FillPolyTables(
 			//if (it == tlidMap.end())
 			//if (!lineById.Requery() || lineById.IsEOF())
 			{
-				DirLineId lineId;
+				GeoDB::DirLineId lineId;
 
 				lineId.id = 0;
 				lineId.dir = lid.dir;
@@ -234,8 +359,12 @@ int FillPolyTables(
 			}
 			//ObjHandle oh;
 			//int err = db.Read(it->second, oh);
-			TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
-			FillTopoTables(line, &lTable, &nTable);
+			//TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
+			GeoDB::Line* line = (GeoDB::Line*)oh.Lock();
+			//if ((err = FillTopoTables2(db, line, &lTable, &nTable)) != 0)
+			//	fprintf(stderr, "** FillTopoTables2 failed: %d\n", err);
+			
+			//FillTopoTables(line, &lTable, &nTable);
 			oh.Unlock();
 			//
 			//	Check first to see if line already in list: some lineById are in the list twice
@@ -261,10 +390,75 @@ int FillPolyTables(
 	return(-1);
 }
 
+int FillPolyTables2(
+	std::map<int, int>& tlidMap,
+	//DAC &dac,
+	TigerDB& db,
+	int nLines,
+	CArray<GeoDB::DirLineId, GeoDB::DirLineId&>& lineIds,
+	LineTable& lTable,
+	NodeTable& nTable
+)
+{
+	try
+	{
+		for (int i = 0; i < nLines; i++)
+		{
+			const GeoDB::DirLineId& lid = lineIds.GetAt(i);
+			long tlid = lid.id;
+
+			ObjHandle oh;
+			DbHash dbHash;
+			dbHash.tlid = tlid;
+			int err = db.dacSearch(DB_GEO_LINE, &dbHash, oh);
+
+			if (err != 0)
+				//std::map<int, int>::iterator it = tlidMap.find(tlid);
+				//if (it == tlidMap.end())
+				//if (!lineById.Requery() || lineById.IsEOF())
+			{
+				GeoDB::DirLineId lineId;
+
+				lineId.id = 0;
+				lineId.dir = lid.dir;
+				lineIds.SetAt(i, lineId/*0*/);		// kludge for now
+				if (tlid != 0)
+					fprintf(stderr, "* FillPolyTables2: cannot find line: %ld\n", tlid);
+				continue;
+			}
+			//ObjHandle oh;
+			//int err = db.Read(it->second, oh);
+			TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
+			FillTopoTables(line, &lTable, &nTable);
+			oh.Unlock();
+			//
+			//	Check first to see if line already in list: some lineById are in the list twice
+			//	  (positive & negative directions)
+			//
+		}
+
+		return(0);
+	}
+	catch (CDBException* e)
+	{
+		fprintf(stderr, "FillPolyTables: DB err: %s\n", e->m_strError);
+	}
+	catch (CMemoryException* e)
+	{
+		fprintf(stderr, "FillPolyTables: memory exception\n");
+	}
+	catch (CException* e)
+	{
+		fprintf(stderr, "FillPolyTables: C exception\n");
+	}
+
+	return(-1);
+}
+
 int AddClosureLines(
 	std::map<int, int>& tlidMap,
 	TigerDB &db, 
-	CArray<DirLineId, DirLineId&>& lineIds,
+	CArray<GeoDB::DirLineId, GeoDB::DirLineId&>& lineIds,
 	int &nLines
 )
 {
@@ -275,14 +469,14 @@ int AddClosureLines(
 		int err = db.Read(it->second, oh);
 		TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
 		assert(it->first == line->userId/*GetTLID()*/);
-		if (line->GetCode() == TigerDB::NVF_USGSClosureLine)
+		if (line->userCode == TigerDB::NVF_USGSClosureLine)
 		{
 			int i;
 			long tlid = it->first;
 
 			for (i = 0; i < nLines; i++)
 			{
-				const DirLineId& lineId = lineIds[i];
+				const GeoDB::DirLineId& lineId = lineIds[i];
 
 				if (lineId.id == tlid /*|| lineIds[ i ] == -tlid*/)
 				{
@@ -292,7 +486,7 @@ int AddClosureLines(
 
 			if (i == nLines)
 			{
-				DirLineId lineId;
+				GeoDB::DirLineId lineId;
 
 				lineId.id = tlid;
 				lineId.dir = 1;
@@ -318,7 +512,7 @@ int main(int argc, char* argv[])
 		CDatabase db;
 		db.SetQueryTimeout(60 * 10);
 		db.Open(_T("TigerBase"), FALSE, TRUE, _T("ODBC;"), FALSE);
-		CArray<DirLineId, DirLineId&> lineIds;
+		CArray<GeoDB::DirLineId, GeoDB::DirLineId&> lineIds;
 		CString baseName = "ME"/*argv[1]*/;
 		TigerDB tDB(&db);
 
@@ -450,11 +644,12 @@ int main(int argc, char* argv[])
 #endif
 			fprintf(stderr, "\nNumber of Lines: %d\n", nLines);
 
-			FillPolyTables(tlidMap, tDB, nLines, lineIds, lTable, nTable);
+			//FillPolyTables(tlidMap, tDB, nLines, lineIds, lTable, nTable);
+			//fprintf(stderr, "\nNumber of Nodes: %d\n", nTable.GetNumItems());
 /**/
 			int stateCode = 23;
-			int nPolys = BuildPoly2(tDB, tlidMap, "HYDRO", OPEN_WATER, 0, lineIds, nLines + count,
-				lTable, nTable, stateCode, TString(baseName), &newId, nLines, "ISLAND", 121);
+			int nPolys = BuildPoly3(tDB, /*tlidMap,*/ "HYDRO", OPEN_WATER, 0, lineIds, nLines + count,
+				/*lTable, nTable,*/ stateCode, TString(baseName), &newId, nLines, "ISLAND", 121);
 			fprintf(stderr, "Number of polygons: %ld\n", nPolys);
 /**/
 			long tSize,
