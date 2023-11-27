@@ -41,6 +41,7 @@
 
 #define TO_TIGERDB
 #define DO_REAT
+#define SET_POLY_NAMES
 
 const int RTSQ =	0;
 const int TIGER_92	= 5;
@@ -489,7 +490,7 @@ NEXT_LINE :
 					rec1.ctbnal != rec1.ctbnar || rec1.countyl != rec1.countyr ||
 					rec1.statel != rec1.stater) ||
 					(rec1.side != '\0') ||
-					(rec1.cfcc[0] == 'A' || rec1.cfcc[0] == 'B' || rec1.cfcc[0] == 'F' || rec1.cfcc[0] == 'H')))
+					(rec1.cfcc[0] == 'A' || rec1.cfcc[0] == 'B' || rec1.cfcc[0] == 'F' || rec1.cfcc[0] == 'H' || rec1.cfcc[0] == 'C')))
 				{
 					nLinesSkipped++;
 					continue;
@@ -971,7 +972,7 @@ NEXT_LINE :
 					dbHash.tlid = dl.id;
 					err = tDB.dacSearch(DB_GEO_LINE, &dbHash, oh);
 					assert(err == 0);
-					TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
+					GeoDB::Line* line = (GeoDB::Line*)oh.Lock();
 					Range2D mbr;
 					mbr = line->GetMBR();
 					line->GetNodes(&sPt, &ePt);
@@ -1004,7 +1005,7 @@ NEXT_LINE :
 					else
 						rval += CalcArea(points, nPts, xcom, ycom, &xcg, &ycg, 1);*/
 					int nSegs = 1;
-					while (!(lastPt == sPt))
+					while (lastPt != sPt)
 					{
 						int i;
 						bool found = false;
@@ -1012,8 +1013,9 @@ NEXT_LINE :
 						{
 							dl = dirLineIds[i];
 							dbHash.tlid = dl.id;
-							err = tDB.dacSearch(DB_TIGER_LINE, &dbHash, oh);
-							TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
+							err = tDB.dacSearch(DB_GEO_LINE, &dbHash, oh);
+							assert(err == 0);
+							GeoDB::Line* line = (GeoDB::Line*)oh.Lock();
 							XY_t sNode, eNode;
 							line->GetNodes(&sNode, &eNode);
 							mbr.Envelope(line->GetMBR());
@@ -1114,9 +1116,9 @@ NEXT_LINE :
 						centroid.x = ps.xcg;
 						centroid.y = ps.ycg;
 
-						Range2D range;
-						range.Envelope(centroid);
-
+						//Range2D range;
+						//range.Envelope(centroid);
+#ifdef SET_POLY_NAMES
 						tDB.Init(/*range*/ps.mbr, &ss);
 						while (tDB.GetNext(&ss, &so) == 0)
 						{
@@ -1126,22 +1128,31 @@ NEXT_LINE :
 							{
 								nPolysFound++;
 								//int nPts = TigerDB::Polygon::GetPts(so, points);
-								GeoDB::Poly* poly = (GeoDB::Poly*)spatialObj;
+								TigerDB::Polygon* poly = (TigerDB::Polygon*)spatialObj;
 								//printf("Poly: %ld with classification: %d", spatialObj->dbAddress(), poly->GetCode());
 								int match = poly->matchPoly(so, orderedLines, ps.start, ps.end);
 								if (match > 0)
 								//if (isPolygonMatch(so, orderedLines, ps.start, ps.end))
 								{
+									std::string name(rec7.laname);
+									poly->SetName(name);
+									err = poly->write();
+									assert(err == 0);
+									if ((err = tDB.TrBegin()) == 0)
+										err = tDB.TrEnd();
+									assert(err == 0);
 									printf("* Poly: %ld matches %s (%d)\n", poly->dbAddress(), rec7.laname, match);
 								}
 								//printf("\n");
 							}
 							so.Unlock();
 						}
+
 						break; // Don't create the Polygon now
-						if ((err = tDB.NewObject(GeoDB::DB_POLY, po)) != 0)
+#endif
+						if ((err = tDB.NewDbObject(GeoDB::DB_POLY, po)) != 0)
 						{
-							fprintf(stderr, "**dbOM.newObject failed\n");
+							fprintf(stderr, "**dbOM.NewDbObject failed\n");
 						}
 
 						poly = (GeoDB::Poly*)po.Lock();
@@ -1149,9 +1160,10 @@ NEXT_LINE :
 						poly->SetArea(ps.area);
 						poly->SetMBR(ps.mbr);
 
-						poly->write();
+						//poly->write();
 						//po.Unlock();
-						tDB.Add(po);
+						err = tDB.Add(po);
+						assert(err == 0);
 					}
 					for (int i = ps.end; --i >= ps.start; )
 						//	for (int i = 0; i < lineCount; i++)
@@ -1171,8 +1183,9 @@ NEXT_LINE :
 				{
 					po.Unlock();
 
-					tDB.TrBegin();
-					tDB.TrEnd();
+					err = tDB.TrBegin();
+					err = tDB.TrEnd();
+					assert(err == 0);
 				}
 				/**/
 

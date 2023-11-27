@@ -516,7 +516,7 @@ int main(int argc, char* argv[])
 		CString baseName = "ME"/*argv[1]*/;
 		TigerDB tDB(&db);
 
-		int err = tDB.Open(TString(/*"C:\\Work\\Waldo2006poly.gdb")*/argv[1]), 1);
+		int err = tDB.Open(TString(argv[1]), 1);
 
 		std::map<int, int> tlidMap;
 		FILE* file = ::fopen("C:\\Work\\Census\\Data\\Maine-2006\\Waldo\\TGR23027Map.tab", "r");
