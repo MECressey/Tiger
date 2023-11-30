@@ -224,6 +224,7 @@
     <ClCompile Include="dogtpoly.cpp" />
     <ClCompile Include="doline.cpp" />
     <ClCompile Include="donames.cpp" />
+    <ClCompile Include="gnis.cpp" />
     <ClCompile Include="namelook.cpp" />
     <ClCompile Include="SCAN.CPP" />
     <ClCompile Include="tgrnames.cpp" />
@@ -237,6 +238,7 @@
     <ClInclude Include="doline.h" />
     <ClInclude Include="donames.h" />
     <ClInclude Include="dopoly.h" />
+    <ClInclude Include="gnis.h" />
     <ClInclude Include="namelook.h" />
     <ClInclude Include="tgrnames.h" />
   </ItemGroup>

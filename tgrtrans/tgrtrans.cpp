@@ -38,6 +38,7 @@
 #include "HASHTABL.HPP"
 #include "TopoTools.h"
 #include "TString.h"
+#include "gnis.h"
 
 #define TO_TIGERDB
 #define DO_REAT
@@ -119,6 +120,24 @@ public:
 	long int hashKey(int nBits) { return HashTable::HashDK(nBits, tlid); }
 };
 
+void splitString(std::string str, char splitter, std::vector<std::string> &result) {
+	//std::vector<std::string> result;
+	std::string current = "";
+	for (int i = 0; i < str.size(); i++) {
+		if (str[i] == splitter) {
+			if (current != "") {
+				result.push_back(current);
+				current = "";
+			}
+			continue;
+		}
+		current += str[i];
+	}
+	if (current.size() != 0)
+		result.push_back(current);
+	//return result;
+}
+
 int main( int argc, char *argv[] )
 {
   char buffer[512];
@@ -155,7 +174,8 @@ int main( int argc, char *argv[] )
 		   doHistory = true,
 		   doZips	= false,
 			 doTigerDB = true/*false*/,
-			 doTopo = false;
+			 doTopo = false,
+			 doGNIS = false;
   int version = 0;
 	int error;
 	double tlFilter = 0.0001;
@@ -172,7 +192,7 @@ int main( int argc, char *argv[] )
 
 		if( argc > 2 && ( argv[ 2 ][ 0 ] == '/' || argv[ 2 ][ 0 ] == '-' ) )
 		{
-			doHistory = doGTpoly = doLines = doNames = doBlocks = doPolys = doAddress = doCreate = doTopo = false;
+			doHistory = doGTpoly = doLines = doNames = doBlocks = doPolys = doAddress = doCreate = doTopo = doGNIS = false;
 			int i = 1;
 			while( argv[2][i] != '\0' )
 			{
@@ -220,6 +240,11 @@ int main( int argc, char *argv[] )
 			  case 'N' :
 			  case 'n' :
 			    doNames = true;
+					break;
+
+				case 'G':
+				case 'g':
+					doGNIS = true;
 					break;
 
 				case 'T':
@@ -1286,6 +1311,71 @@ NEXT_LINE :
 			fclose( csvFile );
 */
 	  }
+
+		if (doGNIS)
+		{
+			FILE* gnisFile = 0;
+			error = tDB.Open(TString(argv[3]), 1);
+
+			std::string county = "Waldo"/*argv[4]*/;  // Maybe support "ALL"
+			//
+			//	Open GNIS point file
+			//
+			if ((gnisFile = ::fopen(argv[1], "r")) == 0)
+			{
+				printf("Cannot open %s\n", argv[1]);
+				goto ERR_RETURN;
+			}
+
+			char record[350];
+			::fgets(record, sizeof(record) - 1, gnisFile);  // Read header record
+			int count = 1;
+			while (! ::feof(gnisFile) && ::fgets(record, sizeof(record) - 1, gnisFile) != NULL)
+			{
+				std::vector<std::string> split;
+				splitString(record, '|', split);
+				//if (strcmp(split[5].c_str(), "Waldo") != 0)
+				if (county != split[5])
+					continue;
+				count++;
+				int size = split.size();
+				int id = atoi(split[0].c_str());
+				double lat = atof(split[12].c_str());
+				double lon = atof(split[13].c_str());
+				TigerDB::GNISFeatures fc = MapFeatureClassToCode(split[2]);
+				//printf(record);
+
+				ObjHandle po;
+				if ((error = tDB.NewDbObject(GeoDB::DB_POINT, po)) != 0)
+				{
+					fprintf(stderr, "**dbOM.NewDbObject failed: %ld\n", error);
+				}
+
+				GeoDB::Point *point = (GeoDB::Point*)po.Lock();
+				point->userCode = fc;
+				point->userId = id;
+				XY_t pt;
+				pt.y = lat;
+				pt.x = lon;
+				point->Set(pt);
+				Range2D mbr;
+				mbr.Add(pt);
+				point->SetMBR(mbr);
+				po.Unlock();
+
+				//po.Unlock();
+				error = tDB.Add(po);
+				assert(error == 0);
+
+				if ((error = tDB.TrBegin()) == 0)
+					error = tDB.TrEnd();
+				assert(error == 0);
+			}
+
+			printf("Read %ld lines from %s\n", count, argv[1]);
+			::fclose(gnisFile);
+		}
+
 #ifdef DO_LATER
 		//
 		//	Process History file - Tiger 94

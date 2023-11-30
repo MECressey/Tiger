@@ -42,6 +42,9 @@
     <ClCompile Include="dogtpoly.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="gnis.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="doaddr.h">
@@ -69,6 +72,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="tgrnames.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="gnis.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
