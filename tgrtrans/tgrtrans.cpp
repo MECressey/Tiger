@@ -40,6 +40,8 @@
 #include "TString.h"
 #include "gnis.h"
 
+using namespace NodeEdgePoly;
+
 #define TO_TIGERDB
 #define DO_REAT
 #define SET_POLY_NAMES
@@ -662,7 +664,7 @@ NEXT_LINE :
 #ifdef TO_TIGERDB
 					ObjHandle dbo;
 
-					if( ( error = tDB.NewObject( DB_GEO_LINE/*DB_TIGER_LINE*/, dbo/*, id*/)) != 0)
+					if( ( error = tDB.NewObject( DB_EDGE/*DB_TIGER_LINE*/, dbo/*, id*/)) != 0)
 					{
 						fprintf( stderr,  "**dbOM.newObject failed\n" );
 						goto CLEAN_UP;
@@ -995,7 +997,7 @@ NEXT_LINE :
 					ObjHandle oh;
 
 					dbHash.tlid = dl.id;
-					err = tDB.dacSearch(DB_GEO_LINE, &dbHash, oh);
+					err = tDB.dacSearch(DB_EDGE, &dbHash, oh);
 					assert(err == 0);
 					GeoDB::Line* line = (GeoDB::Line*)oh.Lock();
 					Range2D mbr;
@@ -1038,7 +1040,7 @@ NEXT_LINE :
 						{
 							dl = dirLineIds[i];
 							dbHash.tlid = dl.id;
-							err = tDB.dacSearch(DB_GEO_LINE, &dbHash, oh);
+							err = tDB.dacSearch(DB_EDGE, &dbHash, oh);
 							assert(err == 0);
 							GeoDB::Line* line = (GeoDB::Line*)oh.Lock();
 							XY_t sNode, eNode;
@@ -1175,7 +1177,7 @@ NEXT_LINE :
 
 						break; // Don't create the Polygon now
 #endif
-						if ((err = tDB.NewDbObject(GeoDB::DB_POLY, po)) != 0)
+						if ((err = tDB.NewDbObject(DB_POLY, po)) != 0)
 						{
 							fprintf(stderr, "**dbOM.NewDbObject failed\n");
 						}
@@ -1196,7 +1198,7 @@ NEXT_LINE :
 						GeoDB::DirLineId& lineId = orderedLines[i];
 						dbHash.tlid = lineId.id;
 						ObjHandle eh;
-						err = tDB.dacSearch(DB_GEO_LINE, &dbHash, eh);
+						err = tDB.dacSearch(DB_EDGE, &dbHash, eh);
 						assert(err == 0);
 						if (j > 0)  // Changing direction of edge in an island
 							lineId.dir = -lineId.dir;
@@ -1346,7 +1348,7 @@ NEXT_LINE :
 				//printf(record);
 
 				ObjHandle po;
-				if ((error = tDB.NewDbObject(GeoDB::DB_POINT, po)) != 0)
+				if ((error = tDB.NewDbObject(DB_POINT, po)) != 0)
 				{
 					fprintf(stderr, "**dbOM.NewDbObject failed: %ld\n", error);
 				}

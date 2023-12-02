@@ -17,6 +17,8 @@
 
 #include "TString.h"
 
+using namespace NodeEdgePoly;
+
 //#define NEW_STUFF
 //#define TEST_HYDRO
 
@@ -908,7 +910,7 @@ FOUND_ONE :
 				// Creating a polygon.  ISLANDS are coming out polygon - FIX LATER!!!
 				ObjHandle po;
 				int err;
-				if ((err = tDB.NewObject(GeoDB::DB_POLY/*DB_TIGER_POLY*/, po/*, id*/)) != 0)
+				if ((err = tDB.NewObject(DB_POLY/*DB_TIGER_POLY*/, po/*, id*/)) != 0)
 				{
 					fprintf(stderr, "**BuildPoly2: dbOM.newObject failed\n");
 				}
@@ -1086,7 +1088,7 @@ int BuildPoly3(
 
 					ObjHandle oh;
 					dbHash.tlid = startId;
-					err = tDB.dacSearch(DB_GEO_LINE, &dbHash, oh);
+					err = tDB.dacSearch(DB_EDGE, &dbHash, oh);
 					if (err != 0)
 					{
 						fprintf(stderr, "* BuildPoly3: cannot find line: %ld\n", startId);
@@ -1333,7 +1335,7 @@ int BuildPoly3(
 				// Creating a polygon.  ISLANDS are coming out polygon - FIX LATER!!!
 				ObjHandle po;
 				int err;
-				if ((err = tDB.NewDbObject(GeoDB::DB_POLY, po/*, id*/)) != 0)
+				if ((err = tDB.NewDbObject(DB_POLY, po/*, id*/)) != 0)
 				{
 					fprintf(stderr, "**BuildPoly3: dbOM.newObject failed\n");
 				}
@@ -1357,7 +1359,7 @@ int BuildPoly3(
 
 					ObjHandle eh;
 					dbHash.tlid = tlid;
-					err = tDB.dacSearch(DB_GEO_LINE, &dbHash, eh);
+					err = tDB.dacSearch(DB_EDGE, &dbHash, eh);
 					if (err != 0)
 					{
 						fprintf(stderr, "* BuildPoly3: cannot find line: %ld\n", startId);

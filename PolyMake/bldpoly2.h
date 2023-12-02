@@ -11,6 +11,8 @@
 //#include "polytabl.hpp"
 #include "tigerdb.hpp"
 
+using namespace NodeEdgePoly;
+
 class DbHash : public DbHashAccess {
 public:
   long tlid;

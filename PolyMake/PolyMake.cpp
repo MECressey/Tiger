@@ -18,6 +18,8 @@
 #include "bldpoly2.h"
 //#include "dac.hpp"
 
+using namespace NodeEdgePoly;
+
 //#ifdef SAVE_FOR_NOW
 
 static int BlkFind(const CString& blk)
@@ -237,7 +239,7 @@ static int addNode(
 	{
 		//assert(pNode == 0 || !(pNode->pt == nodePt) );
 
-		if ((err = db.NewObject(GeoDB::DB_NODE, no/*, id*/)) != 0)
+		if ((err = db.NewObject(DB_NODE, no/*, id*/)) != 0)
 		{
 			fprintf(stderr, "**addNode: dbOM.newObject failed\n");
 		}
@@ -341,7 +343,7 @@ int FillPolyTables(
 			ObjHandle oh;
 			DbHash dbHash;
 			dbHash.tlid = tlid;
-			int err = db.dacSearch(DB_GEO_LINE/*DB_TIGER_LINE*/, &dbHash, oh);
+			int err = db.dacSearch(DB_EDGE/*DB_TIGER_LINE*/, &dbHash, oh);
 
 			if (err != 0)
 			//std::map<int, int>::iterator it = tlidMap.find(tlid);
@@ -410,7 +412,7 @@ int FillPolyTables2(
 			ObjHandle oh;
 			DbHash dbHash;
 			dbHash.tlid = tlid;
-			int err = db.dacSearch(DB_GEO_LINE, &dbHash, oh);
+			int err = db.dacSearch(DB_EDGE, &dbHash, oh);
 
 			if (err != 0)
 				//std::map<int, int>::iterator it = tlidMap.find(tlid);
@@ -535,7 +537,7 @@ int main(int argc, char* argv[])
 			ObjHandle oh;
 			DbHash dbHash;
 			dbHash.tlid = tlid;
-			err = tDB.dacSearch(DB_GEO_LINE, &dbHash, oh);
+			err = tDB.dacSearch(DB_EDGE, &dbHash, oh);
 			assert(err == 0);
 			TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
 			int rec = line->dbAddress();
