@@ -1330,22 +1330,32 @@ int BuildPoly3(
 			}
 			else
 #endif
+			if (rval > 0.0)
 			{
-				nIslands++;
+
 				// Creating a polygon.  ISLANDS are coming out polygon - FIX LATER!!!
 				ObjHandle po;
 				int err;
-				if ((err = tDB.NewDbObject(DB_POLY, po/*, id*/)) != 0)
+				if ((err = tDB.NewDbObject(DB_POLY, po)) != 0)
 				{
-					fprintf(stderr, "**BuildPoly3: dbOM.newObject failed\n");
+					fprintf(stderr, "**BuildPoly3: dbOM.NewDbObject failed\n");
 				}
 
-				GeoDB::Poly* poly = (GeoDB::Poly*)po.Lock();
+				TigerDB::Polygon* poly = (TigerDB::Polygon*)po.Lock();
 
 				poly->SetCode(TigerDB::HYDRO_PerennialLakeOrPond);
-				poly->SetArea(-rval);
+				poly->SetArea(rval);
 				poly->SetMBR(mbr);
-
+				if (rval > 0.0)
+				{
+					nPolys++;
+					poly->SetName("LAKE");
+				}
+				else
+				{
+					poly->SetName("ISLAND");
+					nIslands++;
+				}
 				//err = poly->write();
 				//po.Unlock();
 				err = tDB.Add(po);

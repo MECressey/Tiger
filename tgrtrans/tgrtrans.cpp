@@ -44,7 +44,7 @@ using namespace NodeEdgePoly;
 
 #define TO_TIGERDB
 #define DO_REAT
-#define SET_POLY_NAMES
+//#define SET_POLY_NAMES
 
 const int RTSQ =	0;
 const int TIGER_92	= 5;
@@ -72,6 +72,7 @@ static int BinarySearch( long rnum, i_rnum *, long, long * );
 static TigerDB::Classification MapCFCC( const char *cfcc );
 static double CalcArea(/*TigerDB::Chain* line*/XY_t pts[], int nPts,
 	const double& xcom, const double& ycom, double* xcg, double* ycg, int dir);
+static int FindIdInList(long edgeUseId, GeoDB::dir_t dir, std::vector<GeoDB::DirLineId>& lineIds);
 //static bool isPolygonMatch(ObjHandle &poly, std::vector<DirLineId>& polyLines, int start, int end);
 
 static XY_t points[15000];
@@ -832,6 +833,7 @@ NEXT_LINE :
 	  if( doGTpoly )
 	  {
 			FILE *csvFile = 0;
+			printf("PROCESSING LANDMARK POLYGONS\n");
 			error = tDB.Open(TString(argv[3]), 1);
 
 //
@@ -840,7 +842,7 @@ NEXT_LINE :
 			rt1Name = rootName + tigerExts[RT8_EXT];
 			if ((inFile1 = fopen(rt1Name, "r")) == 0)
 			{
-				printf("Cannot open %s\n", (const char*)rt1Name);
+				printf("* Cannot open %s\n", (const char*)rt1Name);
 				goto ERR_RETURN;
 			}
 
@@ -848,7 +850,7 @@ NEXT_LINE :
 				char cenid[6];
 				long polyid;
 			};
-			std::map<int, LMLink> llMap;
+			std::multimap<int, LMLink> llMap;
 			TigerRec8 rec8;
 			int count = 0;
 			while (rec8.GetNextRec(inFile1) > 0)
@@ -867,7 +869,7 @@ NEXT_LINE :
 			rt1Name = rootName + tigerExts[RTI_EXT];
 			if ((inFile1 = fopen(rt1Name, "r")) == 0)
 			{
-				printf("Cannot open %s\n", (const char*)rt1Name);
+				printf("* Cannot open %s\n", (const char*)rt1Name);
 				goto ERR_RETURN;
 			}
 			struct GTPoly {
@@ -900,7 +902,7 @@ NEXT_LINE :
 			rt1Name = rootName + tigerExts[RTP_EXT];
 			if ((inFile1 = fopen(rt1Name, "r")) == 0)
 			{
-				printf("Cannot open %s\n", (const char*)rt1Name);
+				printf("* Cannot open %s\n", (const char*)rt1Name);
 				goto ERR_RETURN;
 			}
 			struct GeoPoint
@@ -918,7 +920,7 @@ NEXT_LINE :
 				std::string s = recP.cenid + std::to_string(recP.polyid);
 
 				centroidMap.insert({ s, gp });
-				printf("PolyID: %d, Lat: %d, Long: %d\n", recP.polyid, recP.polyLat, recP.polyLong);
+				//printf("PolyID: %d, Lat: %d, Long: %d\n", recP.polyid, recP.polyLat, recP.polyLong);
 			}
 			::fclose(inFile1);
 //
@@ -927,12 +929,13 @@ NEXT_LINE :
 			rt1Name = rootName + tigerExts[RT7_EXT];
 			if ((inFile1 = fopen(rt1Name, "r")) == 0)
 			{
-				printf("Cannot open %s\n", (const char*)rt1Name);
+				printf("* Cannot open %s\n", (const char*)rt1Name);
 				goto ERR_RETURN;
 			}
 
 			int nPolysFound = 0;
 			// Process Landmark polygons
+			int nLandmarkPolys = 0;
 			TigerRec7 rec7;
 			while (rec7.GetNextRec(inFile1) > 0)
 			{
@@ -941,35 +944,69 @@ NEXT_LINE :
 					continue;
 				if (rec7.cfcc[0] != 'H')  // Temporary
 					continue;
-				std::map<int, LMLink>::iterator it = llMap.find(rec7.land);
+				std::multimap<int, LMLink>::iterator it = llMap.find(rec7.land);
 				if (it == llMap.end())
 					continue;
+				auto itr1 = llMap.lower_bound(rec7.land);
+				auto itr2 = llMap.upper_bound(rec7.land);
+				int linkCount = 0;
 				count = 0;
-
-				// Search for the GT poly records
-				LMLink ll = it->second;
-				for (std::vector<GTPoly>::iterator it2 = gtPolys.begin(); it2 != gtPolys.end(); ++it2)
+				printf("  GTPolys: ");
+				while (itr1 != itr2)
 				{
-					GeoDB::DirLineId dl;
-					if (strcmp(it2->cenidl, ll.cenid) == 0 && it2->polyidl == ll.polyid)
+					linkCount++;
+					// Search for the GT poly records
+					LMLink ll = itr1->second;
+					printf("%d, ", ll.polyid);
+					for (std::vector<GTPoly>::iterator it2 = gtPolys.begin(); it2 != gtPolys.end(); ++it2)
 					{
-						dl.id = it2->tlid;
-						dl.dir = -1;
-						dirLineIds.push_back(dl);
-						count++;
+						GeoDB::DirLineId dl;
+						if (strcmp(it2->cenidl, ll.cenid) == 0 && it2->polyidl == ll.polyid)
+						{
+							dl.id = it2->tlid;
+							dl.dir = -1;
+							dirLineIds.push_back(dl);
+							count++;
+						}
+						else if (strcmp(it2->cenidr, ll.cenid) == 0 && it2->polyidr == ll.polyid)
+						{
+							dl.id = it2->tlid;
+							dl.dir = 1;
+							dirLineIds.push_back(dl);
+							count++;
+						}
 					}
-					else if (strcmp(it2->cenidr, ll.cenid) == 0 && it2->polyidr == ll.polyid)
+					itr1++;
+				}
+				printf(" %d, Total edges: %d\n", linkCount, count);
+#ifdef THIS_DIDNT_WORK
+				// Check to see if duplicate edge in different direction
+				for (int i = 0; i < dirLineIds.size(); i++)
+				{
+					for (int j = i + 1; j < dirLineIds.size(); j++)
 					{
-						dl.id = it2->tlid;
-						dl.dir = 1;
-						dirLineIds.push_back(dl);
-						count++;
+						if (dirLineIds[i].id == dirLineIds[j].id)
+						{
+
+							assert(dirLineIds[i].dir != dirLineIds[j].dir);
+							printf("** Duplicate Line %d in LandMark poly: %d\n", dirLineIds[i].id, rec7.land);
+							dirLineIds[i] = dirLineIds.back();
+							dirLineIds.pop_back();
+							dirLineIds[i] = dirLineIds.back();
+							dirLineIds.pop_back();
+							if (i > 0)
+								--i;
+							if (j > 1)
+							--j;
+							break;
+						}
 					}
 				}
+#endif
 				/*printf("Count = %ld\n", count);
 				if (count == 1)
 					continue;*/
-				printf("Processing: %d, name: %s\n", rec7.land, rec7.laname);
+				printf("Processing: %d, name: %s (%s)\n", rec7.land, rec7.laname, rec7.cfcc);
 				int err;
 				struct PolySegment
 				{
@@ -985,6 +1022,7 @@ NEXT_LINE :
 				DbHash dbHash;
 				while (dirLineIds.size() > 0)
 				{
+					ObjHandle nh;
 					GeoDB::DirLineId dl = dirLineIds[0];
 					orderedLines.push_back(dl);
 					dirLineIds[0] = dirLineIds.back();// [dirLineIds.size() - 1] ;
@@ -996,10 +1034,13 @@ NEXT_LINE :
 						ePt;
 					ObjHandle oh;
 
+					long lastEdgeUserId = dl.id;
+
 					dbHash.tlid = dl.id;
 					err = tDB.dacSearch(DB_EDGE, &dbHash, oh);
 					assert(err == 0);
 					GeoDB::Line* line = (GeoDB::Line*)oh.Lock();
+					unsigned char lastEdgeUserCode = line->userCode;
 					Range2D mbr;
 					mbr = line->GetMBR();
 					line->GetNodes(&sPt, &ePt);
@@ -1009,12 +1050,17 @@ NEXT_LINE :
 					XY_t lastPt,
 						startPt;
 					if (dl.dir > 0)
+					{
 						lastPt = ePt;
+						err = line->GetNode(nh, dl.dir);
+					}
 					else
 					{
 						lastPt = sPt;
 						sPt = ePt;
+						err = line->GetNode(nh, 0);
 					}
+					assert(err == 0);
 
 					double xcg = 0.0,
 						ycg = 0.0,
@@ -1034,8 +1080,91 @@ NEXT_LINE :
 					int nSegs = 1;
 					while (lastPt != sPt)
 					{
-						int i;
+						//int i;
+						ObjHandle eh;
+						GeoDB::dir_t outDir,
+							saveDir;
+						double angle;
 						bool found = false;
+						int saveListPos = -1;
+						int pos = -1,
+							savePos = -1;
+						ObjHandle nextEdge;
+						ObjHandle nodeLink = nh;
+						while ((err = GeoDB::Node::GetNextDirectedEdge(nodeLink, eh, &outDir, &angle)) == 0)
+						{
+							pos += 1;
+							GeoDB::Line* line = (GeoDB::Line*)eh.Lock();
+							long id = line->userId;
+
+							if (id == lastEdgeUserId)
+								found = true;
+							else
+							{
+								int foundPos = FindIdInList(id, (outDir > 0) ? -1 : 1, dirLineIds);
+
+								if (foundPos >= 0)
+								{
+									if (saveListPos < 0 || line->userCode == lastEdgeUserCode)
+									{
+										saveListPos = foundPos;
+										saveDir = outDir;
+										savePos = pos;
+										nextEdge = eh;
+									}
+								}
+							}
+							eh.Unlock();
+						}
+						if (saveListPos < 0)  // Didn't find a connecting edge.  Ignore this edge and continue;
+						{
+							assert(found);
+							found = false;
+							printf("** Found an edge (%ld) that didn't connect to any other edge in list: %d\n", lastEdgeUserId, dirLineIds.size());
+							goto PROCESS_POLYSEGS;  // Stop processing list (TEMP)
+						}
+						GeoDB::Line *edge = (GeoDB::Line*)nextEdge.Lock();
+						lastEdgeUserId = edge->userId;
+						XY_t startPt,
+							endPt;
+						edge->GetNodes(&startPt, &endPt);
+						long userId = edge->userId;
+						edge->Get(points);
+						nPts = edge->GetNumPts();
+
+						if (saveDir > 0)
+							assert(endPt == lastPt);
+						else
+							assert(startPt == lastPt);
+						dl = dirLineIds[saveListPos];
+						if (dl.dir < 0)
+							dl.dir = 0;
+						assert(saveDir != dl.dir);
+						if (dl.dir > 0)
+							lastPt = endPt;
+						else
+							lastPt = startPt;
+						err = edge->GetNode(nh, dl.dir > 0 ? dl.dir : 0);
+						assert(err == 0);
+						mbr.Envelope(edge->GetMBR());
+						//GeoPoint::Envelope( &min, &max, currLine->min, currLine->max );
+
+						if (dl.dir <= 0)
+						{
+							rval += CalcArea(points, nPts, xcom, ycom, &xcg, &ycg, -1);
+						}
+						else
+						{
+							rval += CalcArea(points, nPts, xcom, ycom, &xcg, &ycg, 1);
+						}
+						nextEdge.Unlock();
+
+						orderedLines.push_back(dl);
+						dirLineIds[saveListPos] = dirLineIds.back();// [dirLineIds.size() - 1] ;
+						dirLineIds.pop_back();
+						nSegs += 1;
+						found = true;
+#ifdef OLD_WAY
 						for (i = 0; i < dirLineIds.size(); i++)
 						{
 							dl = dirLineIds[i];
@@ -1079,6 +1208,7 @@ NEXT_LINE :
 								break;
 							}
 						}
+#endif
 						if (!found)
 						{
 							printf("** Processing %d, did not find a closed loop.  Directed Edges left: %d\n", rec7.land, dirLineIds.size());
@@ -1089,6 +1219,7 @@ NEXT_LINE :
 					}
 					if (nSegs == 0)  // Error condition!
 					{
+						assert(nSegs > 0);
 						break;
 					}
 					PolySegment ps;
@@ -1110,7 +1241,7 @@ NEXT_LINE :
 					start += nSegs;
 					polySegs.push_back(ps);
 				}
-				
+				PROCESS_POLYSEGS:
 				struct greater_than_key
 				{
 					inline bool operator() (const PolySegment& struct1, const PolySegment& struct2)
@@ -1127,7 +1258,8 @@ NEXT_LINE :
 					//last = polySegs[i].end;
 				}*/
 				ObjHandle po;
-				GeoDB::Poly* poly = 0;
+				bool buildPoly = false;
+				TigerDB::Polygon* poly = 0;
 				for (int j = 0; j < polySegs.size(); j++)
 				{
 					PolySegment ps = polySegs[j];
@@ -1136,6 +1268,7 @@ NEXT_LINE :
 					if (j == 0)
 					{
 						// Search and see if we find the matching polygon already constructed
+#ifdef SET_POLY_NAMES
 						ObjHandle so;
 						GeoDB::Search ss;
 
@@ -1145,7 +1278,7 @@ NEXT_LINE :
 
 						//Range2D range;
 						//range.Envelope(centroid);
-#ifdef SET_POLY_NAMES
+
 						tDB.Init(/*range*/ps.mbr, &ss);
 						while (tDB.GetNext(&ss, &so) == 0)
 						{
@@ -1181,11 +1314,13 @@ NEXT_LINE :
 						{
 							fprintf(stderr, "**dbOM.NewDbObject failed\n");
 						}
-
-						poly = (GeoDB::Poly*)po.Lock();
+						nLandmarkPolys++;
+						poly = (TigerDB::Polygon*)po.Lock();
 						poly->SetCode(MapCFCC(rec7.cfcc));
 						poly->SetArea(ps.area);
 						poly->SetMBR(ps.mbr);
+						std::string name(rec7.laname);
+						poly->SetName(name);
 
 						//poly->write();
 						//po.Unlock();
@@ -1200,15 +1335,20 @@ NEXT_LINE :
 						ObjHandle eh;
 						err = tDB.dacSearch(DB_EDGE, &dbHash, eh);
 						assert(err == 0);
-						if (j > 0)  // Changing direction of edge in an island
-							lineId.dir = -lineId.dir;
+						/*if (j > 0)  // Changing direction of edge in an island
+							lineId.dir = -lineId.dir;*/
+						if (lineId.dir < 0)
+							lineId.dir = 0;
 						err = poly->AddEdge(eh, lineId.dir);
+						assert(err == 0);
 					}
+					po.Unlock();
+					buildPoly = true;
 					break;  // Islands don't work now
 				}
-				if (poly != 0)
+				if (buildPoly)
 				{
-					po.Unlock();
+					//po.Unlock();
 
 					err = tDB.TrBegin();
 					err = tDB.TrEnd();
@@ -1218,7 +1358,11 @@ NEXT_LINE :
 
 				//DoLMarea(csvFile, rec7);
 			}
+			printf("Number of Landmark polygons: %d\n", nLandmarkPolys);
+			fflush(stdout);
+#ifdef SET_POLY_NAMES
 			printf("Number of Hydro polygons found: %d\n", nPolysFound);
+#endif
 /*
 			rt1Name = rootName + tigerExts[RTI_EXT];
 //	    rt1Name.SetAt( length - 1, 'i' );
@@ -2016,9 +2160,12 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 				code = TigerDB::NVF_CensusWaterBoundary3Mile;
 				break;
 
-			case 80 :
+			case 76:
+			case 77:
+				code = TigerDB::NVF_ArtificialPath;
 				break;
 
+			case 80:  // Special water feature; major category used when the minor category could not be determined
 			case 81 :
 				code = TigerDB::HYDRO_Glacier;
 				break;
@@ -2232,6 +2379,21 @@ static double CalcArea(XY_t pts[], int nPts,
 	}
 
 	return(area);
+}
+
+static int FindIdInList(
+	long edgeUseId,
+	GeoDB::dir_t dir,
+	std::vector<GeoDB::DirLineId> &lineIds
+)
+{
+	for (int i = 0; i < lineIds.size(); i++)
+	{
+		const GeoDB::DirLineId& temp = lineIds[i];
+		if (temp.id == edgeUseId && temp.dir == dir)
+			return i;
+	}
+	return -1;
 }
 /*
 static bool isPolygonMatch(ObjHandle &poly, std::vector<DirLineId> &polyLines, int start, int end)
