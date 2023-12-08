@@ -989,7 +989,7 @@ NEXT_LINE :
 						{
 
 							assert(dirLineIds[i].dir != dirLineIds[j].dir);
-							printf("** Duplicate Line %d in LandMark poly: %d\n", dirLineIds[i].id, rec7.land);
+							printf("** Duplicate Edge %d in LandMark poly: %d\n", dirLineIds[i].id, rec7.land);
 							dirLineIds[i] = dirLineIds.back();
 							dirLineIds.pop_back();
 							dirLineIds[i] = dirLineIds.back();
@@ -1039,7 +1039,7 @@ NEXT_LINE :
 					dbHash.tlid = dl.id;
 					err = tDB.dacSearch(DB_EDGE, &dbHash, oh);
 					assert(err == 0);
-					GeoDB::Line* line = (GeoDB::Line*)oh.Lock();
+					GeoDB::Edge* line = (GeoDB::Edge*)oh.Lock();
 					unsigned char lastEdgeUserCode = line->userCode;
 					Range2D mbr;
 					mbr = line->GetMBR();
@@ -1094,7 +1094,7 @@ NEXT_LINE :
 						while ((err = GeoDB::Node::GetNextDirectedEdge(nodeLink, eh, &outDir, &angle)) == 0)
 						{
 							pos += 1;
-							GeoDB::Line* line = (GeoDB::Line*)eh.Lock();
+							GeoDB::Edge* line = (GeoDB::Edge*)eh.Lock();
 							long id = line->userId;
 
 							if (id == lastEdgeUserId)
@@ -1123,7 +1123,7 @@ NEXT_LINE :
 							printf("** Found an edge (%ld) that didn't connect to any other edge in list: %d\n", lastEdgeUserId, dirLineIds.size());
 							goto PROCESS_POLYSEGS;  // Stop processing list (TEMP)
 						}
-						GeoDB::Line *edge = (GeoDB::Line*)nextEdge.Lock();
+						GeoDB::Edge *edge = (GeoDB::Edge*)nextEdge.Lock();
 						lastEdgeUserId = edge->userId;
 						XY_t startPt,
 							endPt;
@@ -1171,7 +1171,7 @@ NEXT_LINE :
 							dbHash.tlid = dl.id;
 							err = tDB.dacSearch(DB_EDGE, &dbHash, oh);
 							assert(err == 0);
-							GeoDB::Line* line = (GeoDB::Line*)oh.Lock();
+							GeoDB::Edge* line = (GeoDB::Edge*)oh.Lock();
 							XY_t sNode, eNode;
 							line->GetNodes(&sNode, &eNode);
 							mbr.Envelope(line->GetMBR());

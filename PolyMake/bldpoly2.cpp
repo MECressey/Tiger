@@ -101,7 +101,7 @@ static double CalcArea( GeoLine *line/*GEOPOINT pts[], int nPts*/,
 static int maxPts = 0;
 static XY_t *points = 0;
 
-static double CalcArea(GeoDB::Line *line,
+static double CalcArea(GeoDB::Edge *line,
 	const double& xcom, const double& ycom, double* xcg, double* ycg, int dir)
 {
 	double area = 0.0;
@@ -612,7 +612,7 @@ FOUND_ONE :
 
 						backTracking = TRUE;
 						startId = temp.id/*polyIds[ --lineCount ]*/;
-						fprintf( stderr, "* BT - Line: %ld (%d)\n", startId, currLine->dfcc );
+						fprintf( stderr, "* BT - Edge: %ld (%d)\n", startId, currLine->dfcc );
 						lid = polyIds[ lineCount - 1 ];
 						startId = lid.id/*polyIds[ lineCount - 1 ]*/;
 /*					if( startId < 0 )
@@ -743,7 +743,7 @@ FOUND_ONE :
 
 				  if( foundLine->tlid == tlid )
 				  {
-					fprintf( stderr, "* Line: %ld (%d) already in list\n", tlid, foundLine->dfcc ); 
+					fprintf( stderr, "* Edge: %ld (%d) already in list\n", tlid, foundLine->dfcc ); 
 					if( i == 0 )
 					  goto START_NEW_POLY;
 
@@ -949,11 +949,11 @@ FOUND_ONE :
 					}
 					if ((err = tDB.Read(it->second, eh)) != 0)
 					{
-						fprintf(stderr, "**BuildPoly2: failed to find Line: %ld\n", it->second);
+						fprintf(stderr, "**BuildPoly2: failed to find Edge: %ld\n", it->second);
 					}
 					if ((err = poly->AddEdge(eh, dir)) != 0)
 					{
-						fprintf(stderr, "**BuildPoly2: failed to add Line: %ld to Poly: %ld\n", it->second, poly->dbAddress());
+						fprintf(stderr, "**BuildPoly2: failed to add Edge: %ld to Poly: %ld\n", it->second, poly->dbAddress());
 					}
 				}
 				po.Unlock();
@@ -1109,7 +1109,7 @@ int BuildPoly3(
 							continue;
 					}
 #endif
-					mbr.Envelope(currLine->GetMBR());  // Line could be a loop
+					mbr.Envelope(currLine->GetMBR());  // Edge could be a loop
 					lid = temp;
 					polyIds.SetAtGrow(lineCount++, lid);
 
@@ -1189,7 +1189,7 @@ int BuildPoly3(
 				while ((err = GeoDB::Node::GetNextDirectedEdge(nodeLink, eh, &outDir, &angle)) == 0)
 				{ 
 					pos += 1;
-					GeoDB::Line* line = (GeoDB::Line*)eh.Lock();
+					GeoDB::Edge* line = (GeoDB::Edge*)eh.Lock();
 					long id = line->userId;
 
 					if (id == temp.id)
@@ -1330,7 +1330,7 @@ int BuildPoly3(
 			}
 			else
 #endif
-			if (rval > 0.0)
+			//if (rval > 0.0)
 			{
 
 				// Creating a polygon.  ISLANDS are coming out polygon - FIX LATER!!!
@@ -1387,11 +1387,11 @@ int BuildPoly3(
 					}
 					/*if ((err = tDB.Read(it->second, eh)) != 0)
 					{
-						fprintf(stderr, "**BuildPoly2: failed to find Line: %ld\n", it->second);
+						fprintf(stderr, "**BuildPoly2: failed to find Edge: %ld\n", it->second);
 					}*/
 					if ((err = poly->AddEdge(eh, dir)) != 0)
 					{
-						fprintf(stderr, "**BuildPoly3: failed to add Line: %ld to Poly: %ld\n", tlid, poly->dbAddress());
+						fprintf(stderr, "**BuildPoly3: failed to add Edge: %ld to Poly: %ld\n", tlid, poly->dbAddress());
 					}
 				}
 				po.Unlock();

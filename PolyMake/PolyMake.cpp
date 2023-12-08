@@ -193,7 +193,7 @@ int FillTopoTables(
 
 static int addNode(
 	TigerDB& db,
-	GeoDB::Line* line,
+	GeoDB::Edge* line,
 	XY_t& nodePt,
 	double angle,
 	unsigned char dir,
@@ -214,7 +214,9 @@ static int addNode(
 	Range2D range = mbr;
 	range.ExtendXY(0.0001);
 	bool found = false;
-	db.Init(range, &ss);
+	GeoDB::searchClasses_t classFilter;
+	classFilter.set(DB_NODE);
+	db.Init(range, classFilter, &ss);
 	while (db.GetNext(&ss, &fo) == 0)
 	{
 		GeoDB::SpatialObj* spatialObj = (GeoDB::SpatialObj*)fo.Lock();
@@ -277,7 +279,7 @@ static int addNode(
 
 int FillTopoTables2(
 	TigerDB &db,
-	GeoDB::Line* line,
+	GeoDB::Edge* line,
 	LineTable* lTable,
 	NodeTable* nTable
 )
@@ -362,7 +364,7 @@ int FillPolyTables(
 			//ObjHandle oh;
 			//int err = db.Read(it->second, oh);
 			//TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
-			GeoDB::Line* line = (GeoDB::Line*)oh.Lock();
+			GeoDB::Edge* line = (GeoDB::Edge*)oh.Lock();
 			//if ((err = FillTopoTables2(db, line, &lTable, &nTable)) != 0)
 			//	fprintf(stderr, "** FillTopoTables2 failed: %d\n", err);
 			
