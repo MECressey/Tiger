@@ -250,7 +250,7 @@ static int addNode(
 		node->Set(nodePt);
 		node->SetMBR(mbr);
 
-		if ((err = node->write()) == 0)
+		if ((err = node->Write()) == 0)
 			err = db.Add(no);
 		if (pNode != 0 && pNode->pt == nodePt)
 			fprintf(stderr, "* addNode: Node (%d) not found but but existed in hash table\n", node->dbAddress());

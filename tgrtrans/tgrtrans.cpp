@@ -696,7 +696,7 @@ NEXT_LINE :
 					line->SetName( names, nNames );
 					//line->SetTLID(rec1.tlid);
 					line->userId = rec1.tlid;
-					if( (error = line->write()) != 0)
+					if( (error = line->Write()) != 0)
 					{
 						fprintf(stderr, "**line->write() failed\n");
 						goto CLEAN_UP;

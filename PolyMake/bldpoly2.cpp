@@ -926,7 +926,7 @@ FOUND_ONE :
 				range.x.max = -69.2134;*/
 				poly->SetMBR(mbr);
 
-				err = poly->write();
+				err = poly->Write();
 				//po.Unlock();
 				err = tDB.Add(po);
 
