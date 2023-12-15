@@ -1049,16 +1049,17 @@ NEXT_LINE :
 					oh.Unlock();
 					XY_t lastPt,
 						startPt;
+					signed char zLevel;
 					if (dl.dir > 0)
 					{
 						lastPt = ePt;
-						err = line->GetNode(nh, dl.dir);
+						err = line->GetNode(nh, dl.dir, &zLevel);
 					}
 					else
 					{
 						lastPt = sPt;
 						sPt = ePt;
-						err = line->GetNode(nh, 0);
+						err = line->GetNode(nh, 0, &zLevel);
 					}
 					assert(err == 0);
 
@@ -1086,12 +1087,13 @@ NEXT_LINE :
 							saveDir;
 						double angle;
 						bool found = false;
+						signed char zLevel;
 						int saveListPos = -1;
 						int pos = -1,
 							savePos = -1;
 						ObjHandle nextEdge;
 						ObjHandle nodeLink = nh;
-						while ((err = GeoDB::Node::GetNextDirectedEdge(nodeLink, eh, &outDir, &angle)) == 0)
+						while ((err = GeoDB::Node::GetNextDirectedEdge(nodeLink, eh, &outDir, &angle, &zLevel)) == 0)
 						{
 							pos += 1;
 							GeoDB::Edge* line = (GeoDB::Edge*)eh.Lock();
@@ -1144,7 +1146,8 @@ NEXT_LINE :
 							lastPt = endPt;
 						else
 							lastPt = startPt;
-						err = edge->GetNode(nh, dl.dir > 0 ? dl.dir : 0);
+						//signed char zLevel;
+						err = edge->GetNode(nh, dl.dir > 0 ? dl.dir : 0, &zLevel);
 						assert(err == 0);
 						mbr.Envelope(edge->GetMBR());
 						//GeoPoint::Envelope( &min, &max, currLine->min, currLine->max );

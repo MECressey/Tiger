@@ -1113,15 +1113,16 @@ int BuildPoly3(
 					lid = temp;
 					polyIds.SetAtGrow(lineCount++, lid);
 
+					signed char zLevel;
 					if (temp.dir > 0)
 					{
 						currLine->GetNodes(&sPt, &ePt);
-						err = currLine->GetNode(nh, temp.dir);
+						err = currLine->GetNode(nh, temp.dir, &zLevel);
 					}
 					else
 					{
 						currLine->GetNodes(&ePt, &sPt);
-						err = currLine->GetNode(nh, 0);
+						err = currLine->GetNode(nh, 0, &zLevel);
 					}
 					assert(err == 0);
 
@@ -1179,6 +1180,7 @@ int BuildPoly3(
 					           saveDir;
 				const GeoDB::DirLineId& temp = polyIds[lineCount - 1];
 				double angle;
+				signed char zLevel;
 				// Get the next directed edge out of the Node star
 				bool found = false;
 				saveListPos = -1;
@@ -1186,7 +1188,7 @@ int BuildPoly3(
 					  savePos = -1;
 				ObjHandle nextEdge;
 				ObjHandle nodeLink = nh;
-				while ((err = GeoDB::Node::GetNextDirectedEdge(nodeLink, eh, &outDir, &angle)) == 0)
+				while ((err = GeoDB::Node::GetNextDirectedEdge(nodeLink, eh, &outDir, &angle, &zLevel)) == 0)
 				{ 
 					pos += 1;
 					GeoDB::Edge* line = (GeoDB::Edge*)eh.Lock();
@@ -1247,7 +1249,8 @@ int BuildPoly3(
 					ePt = endPt;
 				else
 					ePt = startPt;
-				err = edge->GetNode(nh, lid.dir > 0 ? lid.dir : 0);
+				//signed char zLevel;
+				err = edge->GetNode(nh, lid.dir > 0 ? lid.dir : 0, &zLevel);
 				assert(err == 0);
 				lastId = edge->dbAddress();
 				mbr.Envelope(edge->GetMBR());
