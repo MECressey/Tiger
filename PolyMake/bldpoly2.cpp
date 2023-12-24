@@ -107,9 +107,9 @@ static double CalcArea(GeoDB::Edge *line,
 	double area = 0.0;
 	XY_t sNode,
 		eNode;
-	int nPts = line->GetNumPts();
+	int nPts = line->getNumPts();
 
-	line->GetNodes(&sNode, &eNode);
+	line->getNodes(&sNode, &eNode);
 
 	if (nPts > 2)
 	{
@@ -917,18 +917,18 @@ FOUND_ONE :
 
 				GeoDB::Poly* poly = (GeoDB::Poly*)po.Lock();
 
-				poly->SetCode(TigerDB::HYDRO_PerennialLakeOrPond);
-				poly->SetArea(-rval);
+				poly->userCode = TigerDB::HYDRO_PerennialLakeOrPond;
+				poly->setArea(-rval);
 				/*Range2D range;
 				range.y.min = 44.4465;
 				range.x.min = -69.2176;
 				range.y.max = 44.4488;
 				range.x.max = -69.2134;*/
-				poly->SetMBR(mbr);
+				poly->setMBR(mbr);
 
 				err = poly->Write();
 				//po.Unlock();
-				err = tDB.Add(po);
+				err = tDB.addToSpatialTree(po);
 
 				for (int i = lineCount; --i >= 0;)
 				//	for (int i = 0; i < lineCount; i++)
@@ -951,7 +951,7 @@ FOUND_ONE :
 					{
 						fprintf(stderr, "**BuildPoly2: failed to find Edge: %ld\n", it->second);
 					}
-					if ((err = poly->AddEdge(eh, dir)) != 0)
+					if ((err = poly->addEdge(eh, dir)) != 0)
 					{
 						fprintf(stderr, "**BuildPoly2: failed to add Edge: %ld to Poly: %ld\n", it->second, poly->dbAddress());
 					}
@@ -1109,20 +1109,20 @@ int BuildPoly3(
 							continue;
 					}
 #endif
-					mbr.Envelope(currLine->GetMBR());  // Edge could be a loop
+					mbr.Envelope(currLine->getMBR());  // Edge could be a loop
 					lid = temp;
 					polyIds.SetAtGrow(lineCount++, lid);
 
 					signed char zLevel;
 					if (temp.dir > 0)
 					{
-						currLine->GetNodes(&sPt, &ePt);
-						err = currLine->GetNode(nh, temp.dir, &zLevel);
+						currLine->getNodes(&sPt, &ePt);
+						err = currLine->getNode(nh, temp.dir, &zLevel);
 					}
 					else
 					{
-						currLine->GetNodes(&ePt, &sPt);
-						err = currLine->GetNode(nh, 0, &zLevel);
+						currLine->getNodes(&ePt, &sPt);
+						err = currLine->getNode(nh, 0, &zLevel);
 					}
 					assert(err == 0);
 
@@ -1188,7 +1188,7 @@ int BuildPoly3(
 					  savePos = -1;
 				ObjHandle nextEdge;
 				ObjHandle nodeLink = nh;
-				while ((err = GeoDB::Node::GetNextDirectedEdge(nodeLink, eh, &outDir, &angle, &zLevel)) == 0)
+				while ((err = GeoDB::Node::getNextDirectedEdge(nodeLink, eh, &outDir, &angle, &zLevel)) == 0)
 				{ 
 					pos += 1;
 					GeoDB::Edge* line = (GeoDB::Edge*)eh.Lock();
@@ -1226,7 +1226,7 @@ int BuildPoly3(
 				TigerDB::Chain* edge = (TigerDB::Chain*)nextEdge.Lock();
 				XY_t startPt,
 						 endPt;
-				edge->GetNodes(&startPt, &endPt);
+				edge->getNodes(&startPt, &endPt);
 				long userId = edge->userId;
 
 				if (saveDir > 0)
@@ -1250,10 +1250,10 @@ int BuildPoly3(
 				else
 					ePt = startPt;
 				//signed char zLevel;
-				err = edge->GetNode(nh, lid.dir > 0 ? lid.dir : 0, &zLevel);
+				err = edge->getNode(nh, lid.dir > 0 ? lid.dir : 0, &zLevel);
 				assert(err == 0);
 				lastId = edge->dbAddress();
-				mbr.Envelope(edge->GetMBR());
+				mbr.Envelope(edge->getMBR());
 				//GeoPoint::Envelope( &min, &max, currLine->min, currLine->max );
 
 				if (lid.dir <= 0)
@@ -1346,9 +1346,9 @@ int BuildPoly3(
 
 				TigerDB::Polygon* poly = (TigerDB::Polygon*)po.Lock();
 
-				poly->SetCode(TigerDB::HYDRO_PerennialLakeOrPond);
-				poly->SetArea(rval);
-				poly->SetMBR(mbr);
+				poly->userCode = TigerDB::HYDRO_PerennialLakeOrPond;
+				poly->setArea(rval);
+				poly->setMBR(mbr);
 				if (rval > 0.0)
 				{
 					nPolys++;
@@ -1361,7 +1361,7 @@ int BuildPoly3(
 				}
 				//err = poly->write();
 				//po.Unlock();
-				err = tDB.Add(po);
+				err = tDB.addToSpatialTree(po);
 
 				for (int i = lineCount; --i >= 0;)
 					//	for (int i = 0; i < lineCount; i++)
@@ -1392,7 +1392,7 @@ int BuildPoly3(
 					{
 						fprintf(stderr, "**BuildPoly2: failed to find Edge: %ld\n", it->second);
 					}*/
-					if ((err = poly->AddEdge(eh, dir)) != 0)
+					if ((err = poly->addEdge(eh, dir)) != 0)
 					{
 						fprintf(stderr, "**BuildPoly3: failed to add Edge: %ld to Poly: %ld\n", tlid, poly->dbAddress());
 					}

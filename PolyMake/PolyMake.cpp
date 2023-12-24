@@ -144,9 +144,9 @@ int FillTopoTables(
 	newLine->dfcc = line->userCode; // .GetDFCC();
 	//strcpy(newLine->cfcc, line.GetCFCC());
 	lTable->Link(newLine, tlid);
-	line->GetNodes(&newLine->sPt, &newLine->ePt);
-	newLine->mbr = line->GetMBR();
-	if ((newLine->nPts = line->GetNumPts()) > 2)
+	line->getNodes(&newLine->sPt, &newLine->ePt);
+	newLine->mbr = line->getMBR();
+	if ((newLine->nPts = line->getNumPts()) > 2)
 	{
 		if (newLine->pts != 0)
 			delete[] newLine->pts;
@@ -217,14 +217,14 @@ static int addNode(
 	GeoDB::searchClasses_t classFilter;
 	classFilter.set(DB_NODE);
 	db.Init(range, classFilter, &ss);
-	while (db.GetNext(&ss, &fo) == 0)
+	while (db.getNext(&ss, &fo) == 0)
 	{
 		GeoDB::SpatialObj* spatialObj = (GeoDB::SpatialObj*)fo.Lock();
 		GeoDB::SpatialClass sc = spatialObj->IsA();
 		if (sc == GeoDB::POINT)
 		{
 			GeoDB::Node* node = (GeoDB::Node*)spatialObj;
-			XY_t pt = node->GetPt();
+			XY_t pt = node->getPt();
 			fo.Unlock();
 			if (pt == nodePt)
 			{
@@ -248,10 +248,10 @@ static int addNode(
 
 		GeoDB::Node* node = (GeoDB::Node*)no.Lock();
 		node->Set(nodePt);
-		node->SetMBR(mbr);
+		node->setMBR(mbr);
 
 		if ((err = node->Write()) == 0)
-			err = db.Add(no);
+			err = db.addToSpatialTree(no);
 		if (pNode != 0 && pNode->pt == nodePt)
 			fprintf(stderr, "* addNode: Node (%d) not found but but existed in hash table\n", node->dbAddress());
 		no.Unlock();
@@ -290,8 +290,8 @@ int FillTopoTables2(
 	XY_t sPt,
 			 ePt;
 	XY_t *pts = 0;
-	line->GetNodes(&sPt, &ePt);
-	int nPts = line->GetNumPts();
+	line->getNodes(&sPt, &ePt);
+	int nPts = line->getNumPts();
 
 	if (nPts > 2)
 	{

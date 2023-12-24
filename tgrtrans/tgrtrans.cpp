@@ -342,7 +342,7 @@ int main( int argc, char *argv[] )
 				goto CLEAN_UP;
 			}
 
-			const Range2D range = tDB.GetRange();
+			const Range2D range = tDB.getRange();
 			int err = TopoTools::BuildTopology(tDB, range);
 			err = tDB.Close();
 			return 0;
@@ -689,7 +689,7 @@ NEXT_LINE :
 						box.Add(points[i]);
 					}
 
-					line->SetMBR(box);
+					line->setMBR(box);
 /**/
 					line->userCode = cCode;
 			 		//line->SetCode( cCode );
@@ -713,7 +713,7 @@ NEXT_LINE :
 					//error = dac.insert(line, line);
 					dbo.Unlock();
 			
-					if ((error = tDB.Add( dbo )) != 0)
+					if ((error = tDB.addToSpatialTree( dbo )) != 0)
 					{
 						fprintf(stderr, "**tDB.Add() failed\n");
 						goto CLEAN_UP;
@@ -1042,10 +1042,10 @@ NEXT_LINE :
 					GeoDB::Edge* line = (GeoDB::Edge*)oh.Lock();
 					unsigned char lastEdgeUserCode = line->userCode;
 					Range2D mbr;
-					mbr = line->GetMBR();
-					line->GetNodes(&sPt, &ePt);
+					mbr = line->getMBR();
+					line->getNodes(&sPt, &ePt);
 					line->Get(points);
-					int nPts = line->GetNumPts();
+					int nPts = line->getNumPts();
 					oh.Unlock();
 					XY_t lastPt,
 						startPt;
@@ -1053,13 +1053,13 @@ NEXT_LINE :
 					if (dl.dir > 0)
 					{
 						lastPt = ePt;
-						err = line->GetNode(nh, dl.dir, &zLevel);
+						err = line->getNode(nh, dl.dir, &zLevel);
 					}
 					else
 					{
 						lastPt = sPt;
 						sPt = ePt;
-						err = line->GetNode(nh, 0, &zLevel);
+						err = line->getNode(nh, 0, &zLevel);
 					}
 					assert(err == 0);
 
@@ -1093,7 +1093,7 @@ NEXT_LINE :
 							savePos = -1;
 						ObjHandle nextEdge;
 						ObjHandle nodeLink = nh;
-						while ((err = GeoDB::Node::GetNextDirectedEdge(nodeLink, eh, &outDir, &angle, &zLevel)) == 0)
+						while ((err = GeoDB::Node::getNextDirectedEdge(nodeLink, eh, &outDir, &angle, &zLevel)) == 0)
 						{
 							pos += 1;
 							GeoDB::Edge* line = (GeoDB::Edge*)eh.Lock();
@@ -1129,10 +1129,10 @@ NEXT_LINE :
 						lastEdgeUserId = edge->userId;
 						XY_t startPt,
 							endPt;
-						edge->GetNodes(&startPt, &endPt);
+						edge->getNodes(&startPt, &endPt);
 						long userId = edge->userId;
 						edge->Get(points);
-						nPts = edge->GetNumPts();
+						nPts = edge->getNumPts();
 
 						if (saveDir > 0)
 							assert(endPt == lastPt);
@@ -1147,9 +1147,9 @@ NEXT_LINE :
 						else
 							lastPt = startPt;
 						//signed char zLevel;
-						err = edge->GetNode(nh, dl.dir > 0 ? dl.dir : 0, &zLevel);
+						err = edge->getNode(nh, dl.dir > 0 ? dl.dir : 0, &zLevel);
 						assert(err == 0);
-						mbr.Envelope(edge->GetMBR());
+						mbr.Envelope(edge->getMBR());
 						//GeoPoint::Envelope( &min, &max, currLine->min, currLine->max );
 
 						if (dl.dir <= 0)
@@ -1319,15 +1319,15 @@ NEXT_LINE :
 						}
 						nLandmarkPolys++;
 						poly = (TigerDB::Polygon*)po.Lock();
-						poly->SetCode(MapCFCC(rec7.cfcc));
-						poly->SetArea(ps.area);
-						poly->SetMBR(ps.mbr);
+						poly->userCode = MapCFCC(rec7.cfcc);
+						poly->setArea(ps.area);
+						poly->setMBR(ps.mbr);
 						std::string name(rec7.laname);
 						poly->SetName(name);
 
 						//poly->write();
 						//po.Unlock();
-						err = tDB.Add(po);
+						err = tDB.addToSpatialTree(po);
 						assert(err == 0);
 					}
 					for (int i = ps.end; --i >= ps.start; )
@@ -1342,7 +1342,7 @@ NEXT_LINE :
 							lineId.dir = -lineId.dir;*/
 						if (lineId.dir < 0)
 							lineId.dir = 0;
-						err = poly->AddEdge(eh, lineId.dir);
+						err = poly->addEdge(eh, lineId.dir);
 						assert(err == 0);
 					}
 					po.Unlock();
@@ -1509,11 +1509,11 @@ NEXT_LINE :
 				point->Set(pt);
 				Range2D mbr;
 				mbr.Add(pt);
-				point->SetMBR(mbr);
+				point->setMBR(mbr);
 				po.Unlock();
 
 				//po.Unlock();
-				error = tDB.Add(po);
+				error = tDB.addToSpatialTree(po);
 				assert(error == 0);
 
 				if ((error = tDB.TrBegin()) == 0)
