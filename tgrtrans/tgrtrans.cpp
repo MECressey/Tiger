@@ -343,7 +343,7 @@ int main( int argc, char *argv[] )
 			}
 
 			const Range2D range = tDB.getRange();
-			int err = TopoTools::BuildTopology(tDB, range);
+			int err = TopoTools::buildTopology(tDB, range);
 			err = tDB.Close();
 			return 0;
 		}
@@ -1226,9 +1226,9 @@ NEXT_LINE :
 						break;
 					}
 					PolySegment ps;
-					if (rval < 0.0)
-						rval = -rval;
-					ps.area = rval;
+/*					if (rval < 0.0)
+						rval = -rval;*/
+					ps.area = -rval;
 					ps.mbr = mbr;
 					{
 						double areai = 1.0 / rval;
@@ -1267,8 +1267,10 @@ NEXT_LINE :
 				{
 					PolySegment ps = polySegs[j];
 					/**/
+//					if (ps.area <= 0)  // Islands don't work
+//						break;
 
-					if (j == 0)
+//					if (j == 0)
 					{
 						// Search and see if we find the matching polygon already constructed
 #ifdef SET_POLY_NAMES
@@ -1323,31 +1325,36 @@ NEXT_LINE :
 						poly->setArea(ps.area);
 						poly->setMBR(ps.mbr);
 						std::string name(rec7.laname);
-						poly->SetName(name);
+						if (ps.area >= 0.0)
+							poly->SetName(name);
+						else
+							poly->SetName("Island");
 
 						//poly->write();
 						//po.Unlock();
 						err = tDB.addToSpatialTree(po);
 						assert(err == 0);
 					}
-					for (int i = ps.end; --i >= ps.start; )
-						//	for (int i = 0; i < lineCount; i++)
+					for (int i = ps.start; i < ps.end; i++)  // counter-clock wise
+					//for (int i = ps.end; --i >= ps.start; )
 					{
 						GeoDB::DirLineId& lineId = orderedLines[i];
 						dbHash.tlid = lineId.id;
 						ObjHandle eh;
 						err = tDB.dacSearch(DB_EDGE, &dbHash, eh);
 						assert(err == 0);
-						/*if (j > 0)  // Changing direction of edge in an island
-							lineId.dir = -lineId.dir;*/
-						if (lineId.dir < 0)
+						if (lineId.dir > 0)
 							lineId.dir = 0;
+						else
+							lineId.dir = 1;
+						/*if (lineId.dir < 0)
+							lineId.dir = 0;*/
 						err = poly->addEdge(eh, lineId.dir);
 						assert(err == 0);
 					}
 					po.Unlock();
 					buildPoly = true;
-					break;  // Islands don't work now
+					//break;  // Islands don't work now
 				}
 				if (buildPoly)
 				{

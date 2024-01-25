@@ -1347,9 +1347,9 @@ int BuildPoly3(
 				TigerDB::Polygon* poly = (TigerDB::Polygon*)po.Lock();
 
 				poly->userCode = TigerDB::HYDRO_PerennialLakeOrPond;
-				poly->setArea(rval);
+				poly->setArea(-rval);
 				poly->setMBR(mbr);
-				if (rval > 0.0)
+				if (rval < 0.0)
 				{
 					nPolys++;
 					poly->SetName("LAKE");
@@ -1363,8 +1363,8 @@ int BuildPoly3(
 				//po.Unlock();
 				err = tDB.addToSpatialTree(po);
 
-				for (int i = lineCount; --i >= 0;)
-					//	for (int i = 0; i < lineCount; i++)
+				//for (int i = lineCount; --i >= 0;)
+				for (int i = 0; i < lineCount; i++)  // counter-clock wise
 				{
 					const GeoDB::DirLineId& lineId = polyIds[i];
 					long tlid = lineId.id;
@@ -1381,13 +1381,10 @@ int BuildPoly3(
 					}
 					//std::map<int, int>::iterator it = tlidMap.find(tlid);
 					if (lineId.dir > 0)
-					{
-						dir = 1;
-					}
+						dir = 0/*1*/;
 					else
-					{
-						dir = 0;
-					}
+						dir = 1/*0*/;
+		
 					/*if ((err = tDB.Read(it->second, eh)) != 0)
 					{
 						fprintf(stderr, "**BuildPoly2: failed to find Edge: %ld\n", it->second);

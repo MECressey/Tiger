@@ -523,6 +523,7 @@ int main(int argc, char* argv[])
 		int err = tDB.Open(TString(argv[1]), 1);
 
 		std::map<int, int> tlidMap;
+#ifdef SAVE_FOR_NOW
 		FILE* file = ::fopen("C:\\Work\\Census\\Data\\Maine-2006\\Waldo\\TGR23027Map.tab", "r");
 		short s;
 		//DAC dac;
@@ -547,6 +548,7 @@ int main(int argc, char* argv[])
 			tlidMap.insert({ tlid, recPtr });
 			oh.Unlock();
 		}
+#endif
 
 #ifdef TESTING_POLYGON
 		// Creating a polygon
