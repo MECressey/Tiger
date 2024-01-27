@@ -1,10 +1,27 @@
+/*
+* TgrTrans is a program that converts Tiger/Line files to a GeoDB.  The Tiger/Line files ended in 2006 and the Census
+* Bureau started using ESRI shapefiles as the data exchange format.
+* 
+* The 1st program argument is the Tiger/Line file name
+* The 2nd argument is the translation flag:
+* 	'C' | 'c' - creates a GeoDB.  It is followed by 4 floating point numbers indicating the MBR of the database
+*		'I' | 'i' - creates Landmark (GT) polygons.  Uses the 7, 8, I and P record type files
+*		'H' | 'h' - processes the history file.
+*		'p' | 'P' : reads the .F51 file and creates a .csv file that needs to be loaded into a SQL Server
+*		'L' | 'l' : creates Tiger chains.  Processes the .RT1 and .RT2 files.  The 3rd argument is the TigerDB name
+*		'B' | 'b' : creates a file with Census block boundaries (*b.tab) that is loaded into a SQL Server
+*		'A' | 'a' : processes the RT6 file for addresses
+*		'N' | 'n' : processes extra Tiger/Line names from the RT4 files and creates a *n.tab file that is loaded into a SQL Server
+*		'G' | 'g' : processes the GNIS names file in argument 2.  It creates a POINT object and sets the userCode to the Feature Class.  Set the userId too
+*		'T' | 't' : builds topology in a GeoDB given a range of data
+*		'Z' | 'z' : process zipcodes.
+*/
 #include <afx.h>
 
 #include <stdlib.h>
 #include <search.h>
 #include <limits.h>
 #include <stdio.h>
-//#include <cstdio>
 #include <sys\types.h>
 #include <sys\stat.h>
 #include <wchar.h>
@@ -17,19 +34,16 @@
 #include "range.hpp"
 
 #include "doblock.h"
-//#include "dopoly.h"
 #include "doaddr.h"
 #include "donames.h"
 #include "dogtpoly.h"
-//#include "dohist.h"
 #include "tgrnames.h"
 #include "namelook.h"
-//#include "distname.h"
 #include "tgrtypes.h"
 #include "tigerdb.hpp"
 #include "trendlin.h"
 #include "doline.h"
-//#include "DAC.HPP"
+
 #include <map>
 #include <array>
 #include <vector>
@@ -52,13 +66,7 @@ const int TIGER_94	= 21;
 
 static short GetStateFips( const TCHAR * );
 static short GetCountyFips( const TCHAR * );
-/*
-struct DirLineId
-{
-	long tlid;
-	signed char dir;
-};
-*/
+
 struct i_rnum
 {
    long rnum;
@@ -73,27 +81,28 @@ static TigerDB::Classification MapCFCC( const char *cfcc );
 static double CalcArea(/*TigerDB::Chain* line*/XY_t pts[], int nPts,
 	const double& xcom, const double& ycom, double* xcg, double* ycg, int dir);
 static int FindIdInList(long edgeUseId, GeoDB::dir_t dir, std::vector<GeoDB::DirLineId>& lineIds);
-//static bool isPolygonMatch(ObjHandle &poly, std::vector<DirLineId>& polyLines, int start, int end);
+static bool chainEqual(ObjHandle& oh, unsigned nPts, XY_t pts[], TigerDB::Classification cCode);
 
 static XY_t points[15000];
 
-#define RT1_EXT				0
-#define RT2_EXT				1
-#define RT3_EXT				2
-#define RT4_EXT				3
-#define RT5_EXT				4
-#define RT6_EXT				5
-#define RT7_EXT				6
-#define RT8_EXT				7
-#define RT9_EXT				8
-#define RTA_EXT				9
-#define RTC_EXT				10
-#define RTH_EXT				11
-#define RTI_EXT				12
-#define RTP_EXT				13
-#define RTR_EXT				14
-#define RTS_EXT				15
-#define RTZ_EXT				16
+// Tiger extension types
+const int RT1_EXT = 0;
+const int RT2_EXT = 1;
+const int RT3_EXT = 2;
+const int RT4_EXT = 3;
+const int RT5_EXT = 4;
+const int RT6_EXT = 5;
+const int RT7_EXT = 6;
+const int RT8_EXT = 7;
+const int RT9_EXT = 8;
+const int RTA_EXT = 9;
+const int RTC_EXT = 10;
+const int RTH_EXT = 11;
+const int RTI_EXT = 12;
+const int RTP_EXT = 13;
+const int RTR_EXT = 14;
+const int RTS_EXT = 15;
+const int RTZ_EXT = 16;
 
 static const TCHAR *tigerExts[] = 
 {
@@ -116,15 +125,8 @@ static const TCHAR *tigerExts[] =
 	_T(".RTZ"),
 };
 
-class DbHash : public DbHashAccess {
-public:
-	long tlid;
-	int is_equal(DbObject* dbo) { return this->tlid == ((TigerDB::Chain*)dbo)->userId/*GetTLID()*/; }
-	long int hashKey(int nBits) { return HashTable::HashDK(nBits, tlid); }
-};
-
+// This method is used to emulate the string split() method found in other languages such as Java, Python, etc.
 void splitString(std::string str, char splitter, std::vector<std::string> &result) {
-	//std::vector<std::string> result;
 	std::string current = "";
 	for (int i = 0; i < str.size(); i++) {
 		if (str[i] == splitter) {
@@ -138,7 +140,6 @@ void splitString(std::string str, char splitter, std::vector<std::string> &resul
 	}
 	if (current.size() != 0)
 		result.push_back(current);
-	//return result;
 }
 
 int main( int argc, char *argv[] )
@@ -149,22 +150,22 @@ int main( int argc, char *argv[] )
   CString rt1Name,
   				baseName,
   			  fName;
-  int dirIdx,
-      dotIdx,
+  int /*dirIdx,
+      dotIdx,*/
       length;
   XY_t sNode,
 		   eNode;
   FILE *csvLines = 0,
-  	   *csvBlocks = 0,
-  	   *csvBlocks2 = 0,
+  	   *tabBlocks = 0,
+  	   *tabBlocks2 = 0,
   	   *csvNames = 0,
   	   *csvAddr = 0,
-	   *csvPoly = 0,
+			 *csvPoly = 0,
   	   *inFile1 = 0,
   	   *inFile2 = 0,
-	   *mappingFile = 0;
-  short countyFips;
-	int		stateFips;
+			 *equivFile = 0;
+  short countyFips = 0;
+	int		stateFips = 0;
   i_rnum *index = 0;
   long nIndex;
 	bool doCreate = false,
@@ -176,13 +177,13 @@ int main( int argc, char *argv[] )
 		   doGTpoly = true,
 		   doHistory = true,
 		   doZips	= false,
-			 doTigerDB = true/*false*/,
+			 doTigerDB = true,
 			 doTopo = false,
 			 doGNIS = false;
   int version = 0;
 	int error;
 	double tlFilter = 0.0001;
-	int doTrendLine = 0/* 1 */;
+	bool doTrendLine = false;
 
 	if( argc <= 1 )
 	{
@@ -270,23 +271,22 @@ int main( int argc, char *argv[] )
 		CDatabase db;
 		db.SetQueryTimeout(60 * 10);
 		db.Open( _T("TigerBase"), FALSE, TRUE, _T("ODBC;"), FALSE );
-//		db.SetSynchronousMode(TRUE);
 #ifdef TO_TIGERDB
 		TigerDB tDB(&db);
-		//DAC dac;
 #endif
 		CString rootName;
 
-		TgrNames tgrNames( &db );
-		NameLook nLook( &db );
+		TgrNames tgrNames(&db);
+		NameLook nLook(&db);
 //		DistNames distName( &db );
 
-	  length = ::strlen( buffer );
-	  ::fputs( buffer, stdout );
+	  length = ::strlen(buffer);
+	  ::fputs(buffer, stdout);
 
-	  if( buffer[ length - 1 ] == '\n' )
-			buffer[ length - 1 ] = '\0';
+	  if( buffer[length - 1] == '\n' )
+			buffer[length - 1] = '\0';
     
+		// Create a GeoDB
 		if (doCreate)
 		{
 			char input[80];
@@ -333,7 +333,8 @@ int main( int argc, char *argv[] )
 
 			return 0;
 		}
-
+		
+		// Build topology
 		if (doTopo)
 		{
 			if (doTigerDB && (error = tDB.Open(TString(argv[3]), 1)) != 0)
@@ -350,49 +351,47 @@ int main( int argc, char *argv[] )
 
 	  rt1Name = (const char *)&buffer[ 0 ];
 //		rt1Name += tigerExts[RT1_EXT];
-	  if( ( inFile1 = ::fopen( TString(rt1Name), "r" ) ) == NULL )
+	  if( (inFile1 = ::fopen( TString(rt1Name), "r" )) == NULL)
 	  {
 			printf( "* TgrTrans - cannot open required Tiger record 1 file" );
 	    goto ERR_RETURN;
 	  }
 
-	  dirIdx = rt1Name.Find( _T("TGR") )/*rt1Name.ReverseFind( 'r' ) + 1*/;
-	  dotIdx = rt1Name.ReverseFind( '.' );
+	  int dirIdx = rt1Name.Find( _T("TGR") )/*rt1Name.ReverseFind( 'r' ) + 1*/;
+	  int dotIdx = rt1Name.ReverseFind( '.' );
 	  rootName = rt1Name.Left(dotIdx);
 		printf( "\nRoot name: %s\n", (const char*)rootName);
 //	  rootName = rt1Name.Mid( dirIdx, dotIdx - dirIdx )/*rt1Name.Left(dotIdx)*/;
 
 	  baseName = rootName/*rt1Name.Mid( dirIdx, dotIdx - dirIdx )*/;
-	  countyFips = GetCountyFips( baseName );
-	  stateFips = GetStateFips( baseName );
+	  countyFips = GetCountyFips(baseName);
+	  stateFips = GetStateFips(baseName);
 
 		printf( "\nState: %d, County: %d\n", stateFips, countyFips);
 
+		// Setup for processing names
 		if( doNames )
 		{
 			tgrNames.m_strFilter = _T("(STATE = ?) AND (COUNTY = ?) AND (NAME = ?)");
 			tgrNames.m_nParams = 3;
 			tgrNames.stateFips = stateFips;
 			tgrNames.countyFips = countyFips;
-			tgrNames.qName = _T("");
-			tgrNames.Open( CRecordset::forwardOnly, 0, CRecordset::readOnly );
-			while (!tgrNames.IsEOF())
-				tgrNames.MoveNext();
 		}
 //
 //	Pre-process the .f52 file
 //
 	  length = rt1Name.GetLength();
 
+		// Setup for processing lines (or chains)
+			tgrNames.qName = _T("");
+			tgrNames.Open( CRecordset::forwardOnly, 0, CRecordset::readOnly );
+			while (!tgrNames.IsEOF())
+				tgrNames.MoveNext();
 	  if( doLines )
 	  {
-		  fName = baseName + "Map.tab";
-		  mappingFile = ::fopen(TString(fName), "w");
-			//error = tDB.dacCreate(TString(argv[3]), 1 << 16);
-			//error = dac.create(TString("C:\\Work\\Waldo2006.dac"), 1 << 16);
-			//short s;
-			//error = dac.open(TString("C:\\Work\\Waldo2006.dac"), 0, 1, &s);
-#ifdef TO_TIGERDB
+		  fName.Format(_T("%d_Equiv.tab"), stateFips);
+		  equivFile = ::fopen(TString(fName), "w+");
+#if defined(TO_TIGERDB)
       if( doTigerDB && (error = tDB.Open( TString(argv[3]), 1)) != 0 )
 			{
 				fprintf( stderr, "* Cannot open Tiger DB: %s\n", argv[ 3 ] );
@@ -400,7 +399,6 @@ int main( int argc, char *argv[] )
 			}
 #endif
 			rt1Name = rootName + tigerExts[RT2_EXT];
-/*			rt1Name.SetAt( length - 1, '2' );*/
 			nIndex = DoShapeIndex( rt1Name, &index );
 			inFile2 = ::fopen( TString(rt1Name), "r" );
 			fName = baseName + _T("l.tab");
@@ -412,7 +410,7 @@ int main( int argc, char *argv[] )
 			nLook.Open( CRecordset::forwardOnly, 0, CRecordset::readOnly );
 			while( ! nLook.IsEOF() )
 				nLook.MoveNext();
-#ifdef SAVE_FOR_NOW
+#if defined(SAVE_FOR_NOW)
 			distName.nameParam = "";
 			distName.Open( CRecordset::forwardOnly, 0, CRecordset::readOnly );
 			while( ! distName.IsEOF() )
@@ -423,10 +421,10 @@ int main( int argc, char *argv[] )
 	  if( doBlocks )
 	  {
 	    fName = baseName + "b.tab";
-	    csvBlocks = ::fopen( TString(fName), "w" );
+	    tabBlocks = ::fopen( TString(fName), "w" );
 /*  Don't open this file
 	    fName = baseName + "b2.csv";
-	    csvBlocks2 = ::fopen( TString(fName), "w" );
+	    tabBlocks2 = ::fopen( TString(fName), "w" );
 */
 	  }
 
@@ -449,10 +447,11 @@ int main( int argc, char *argv[] )
 			csvPoly = ::fopen( TString(fName), "w" );
 	  }
 //
-//	Process the .F51 file
+//	Process the Tiger Record 1 file
 //
 	  if( doLines || doBlocks || doAddress || doNames || doPolys )
 	  {
+			Range2D dataRange;
 			TigerRec1 rec1;
 			while( rec1.GetNextRec( inFile1 ) > 0 )
 			{
@@ -463,8 +462,8 @@ int main( int argc, char *argv[] )
 
 			  nLines++;
 				if( doNames && 
-						( rec1.fn.fedirp[0] != '\0' || rec1.fn.fename[0] != '\0' ||
-						  rec1.fn.fetype[0] != '\0' || rec1.fn.fedirs[0] != '\0' ) )
+						(rec1.fn.fedirp[0] != '\0' || rec1.fn.fename[0] != '\0' ||
+						  rec1.fn.fetype[0] != '\0' || rec1.fn.fedirs[0] != '\0' ))
 				{ 
 					tgrNames.qName = rec1.fn.fename;
 					tgrNames.Requery();
@@ -498,32 +497,31 @@ int main( int argc, char *argv[] )
 				}
 NEXT_LINE :
 	      if( doBlocks )
-					DoBlocks( csvBlocks, csvBlocks2, rec1 );
+					DoBlocks(tabBlocks, tabBlocks2, rec1);
 			  if( doAddress )
 					DoAddress( csvAddr, rec1.tlid, 0, rec1.ar );
-#ifdef DO_LATER
+#if defined(DO_LATER)
 			  if( doPolys ) DoPolygons( csvPoly, rec1 );
 #endif
 			  if( ! doLines ) continue;
 //
 //	Get points now so we can do MBR
 //
-				TigerDB::Classification cCode = MapCFCC( rec1.cfcc );
+				TigerDB::Classification cCode = MapCFCC(rec1.cfcc);
 
 //	Process only the desired lines:
 //	1) If line is a border
 //	2) If line defines a census block
 //	3) If line is a road, water or political boundary
 				if (!((rec1.blkl != rec1.blkr || rec1.blkls != rec1.blkrs ||
-					rec1.ctbnal != rec1.ctbnar || rec1.countyl != rec1.countyr ||
-					rec1.statel != rec1.stater) ||
+					     rec1.ctbnal != rec1.ctbnar || rec1.countyl != rec1.countyr ||
+					     rec1.statel != rec1.stater) ||
 					(rec1.side != '\0') ||
 					(rec1.cfcc[0] == 'A' || rec1.cfcc[0] == 'B' || rec1.cfcc[0] == 'F' || rec1.cfcc[0] == 'H' || rec1.cfcc[0] == 'C')))
 				{
 					nLinesSkipped++;
 					continue;
 				}
-
 
 				TigerDB::Name names[5];
 				int nNames = 0;
@@ -546,8 +544,8 @@ NEXT_LINE :
 						{_T("State Hwy "),	TigerDB::ROAD_SecondaryAndConnecting}
 					};
 //
-//	REAT the line if it's a Road type
-					if( rec1.cfcc[0] == 'A' )
+//	REAT the line if it's a Road type.  REATing is changing the road type based on the road name
+					if( rec1.cfcc[0] == 'A' )  // Roads
 					{
 						int pos;
 
@@ -566,7 +564,7 @@ NEXT_LINE :
 							}
 						}
 					}
-#ifdef DO_REAT
+#if defined(DO_REAT)
 					nLook.tlid = rec1.tlid;
 					nLook.Requery();
 					while( ! nLook.IsEOF() )
@@ -634,38 +632,94 @@ NEXT_LINE :
 				}
 
 			  long offset;
-			  if( BinarySearch( rec1.tlid, index, nIndex, &offset ) )
+			  if( BinarySearch(rec1.tlid, index, nIndex, &offset ))
 			  {
 			    TigerRec2 rec2;
 			    long tlid = 0;
 
-			    fseek( inFile2, index[ offset ].fpos, SEEK_SET );
+			    fseek(inFile2, index[ offset ].fpos, SEEK_SET);
 			    nPoints += rec2.GetPoints( inFile2, &tlid, &points[ 1 ],
 			      sizeof(points) / sizeof(points[0]));
 			  }
 
-			  if( ( rec1.blkl != rec1.blkr || rec1.blkls != rec1.blkrs ||
+			  if( (rec1.blkl != rec1.blkr || rec1.blkls != rec1.blkrs ||
 							rec1.ctbnal != rec1.ctbnar || rec1.countyl != rec1.countyr ||
-							rec1.statel != rec1.stater ) && cCode == TigerDB::NotClassified )
+							rec1.statel != rec1.stater ) && cCode == TigerDB::NotClassified)
 				{
-					fprintf( stderr, "TgrTrans: line %ld defines Census Block but no code\n",
-							rec1.tlid );
+					fprintf(stderr, "TgrTrans: line %ld defines Census Block but no code\n", rec1.tlid);
 				}
 
-			  rec1.GetFromGeoPoint( &points[0] );
-			  rec1.GetToGeoPoint( &points[nPoints - 1] );
+			  rec1.GetFromGeoPoint(&points[0]);
+			  rec1.GetToGeoPoint(&points[nPoints - 1]);
 
-				if( doTrendLine )
+				if (doTrendLine)  // Thin line is specified
 				{
 					nPoints = TrendLine( points, nPoints, tlFilter );
 				}
 
+				Range2D mbr;  // Calculate and set the MBR of the chain
+				mbr.Init();
+				for (unsigned i = 0; i < nPoints; i++)
+					mbr.Add(points[i]);
+
+				dataRange.Envelope(mbr);  // Keep the entire data range
 				if (doTigerDB)
  				{
-#ifdef TO_TIGERDB
-					ObjHandle dbo;
+#if defined(TO_TIGERDB)
+					// Check state boundary lines to see if the line already exists in the database (from another county)
+					if (rec1.countyl != rec1.countyr)
+					{
+						ObjHandle fo;
 
-					if( ( error = tDB.NewObject( DB_EDGE/*DB_TIGER_LINE*/, dbo/*, id*/)) != 0)
+						DbObject::Id equivId = 0;
+						GeoDB::Edge::Hash dbHash;
+						dbHash.id = rec1.tlid;
+						if ((error = tDB.dacSearch(DB_EDGE, &dbHash, fo)) == 0)	// Sometimes the chains share a common TLID between counties
+						{
+							bool equiv = chainEqual(fo, nPoints, points, cCode);
+							assert(equiv);
+
+							equivId = rec1.tlid;
+						}
+						else  // search spatially for the boundary chain
+						{
+
+							GeoDB::Search ss;
+							GeoDB::searchClasses_t searchFilter;
+							searchFilter.set(DB_EDGE);
+							tDB.Init(mbr, searchFilter, &ss);
+							while ((error = tDB.getNext(&ss, &fo)) == 0)
+							{
+								GeoDB::Edge* edge = (GeoDB::Edge*)fo.Lock();
+								GeoDB::SpatialClass sc = edge->IsA();
+								long userId = edge->userId;
+								fo.Unlock();
+								if (sc == GeoDB::LINE)
+								{
+									bool equiv = chainEqual(fo, nPoints, points, cCode);
+									if (equiv)
+									{
+										equivId = edge->userId;
+										fprintf(equivFile, "%ld\t%ld\n", rec1.tlid, userId);
+									}
+								}
+
+								if (equivId != 0)
+								{
+									break;
+								}
+							}
+						}
+						if (equivId != 0)
+						{
+							printf("* %ld (%d) is equivalent to %ld\n", rec1.tlid, stateFips, equivId);
+							nLinesSkipped += 1;
+							continue;
+						}
+					}
+
+					ObjHandle dbo;
+					if( ( error = tDB.NewDbObject(DB_EDGE, dbo)) != 0)
 					{
 						fprintf( stderr,  "**dbOM.newObject failed\n" );
 						goto CLEAN_UP;
@@ -674,43 +728,27 @@ NEXT_LINE :
 					TigerDB::Chain *line = (TigerDB::Chain *)dbo.Lock();
 
 					line->Init();
-					line->line_coor.init();
+					//line->line_coor.init();
 
-/*					if ((error = line->Set((unsigned)nPoints, points)) != 0)
+					line->setMBR(mbr);
+
+					line->userCode = cCode;
+					line->SetName(names, nNames);	// Don't store the actual names in the Chain (retrieve from the SQL database)
+					line->userId = rec1.tlid;			// TLID is unique
+					/*if ((error = line->Write()) != 0)	// We call Write() because the Chain just lives in memory
 					{
-						fprintf(stderr, "**line->Set() failed\n");
+						fprintf(stderr, "**line->Write() failed\n");
 						goto CLEAN_UP;
 					}*/
-	//			 	line->Set( id );
-/**/					Range2D box;
-					box.Init();
-					for (unsigned i = 0; i < nPoints; i++)
-					{
-						box.Add(points[i]);
-					}
-
-					line->setMBR(box);
-/**/
-					line->userCode = cCode;
-			 		//line->SetCode( cCode );
-					line->SetName( names, nNames );
-					//line->SetTLID(rec1.tlid);
-					line->userId = rec1.tlid;
-					if( (error = line->Write()) != 0)
-					{
-						fprintf(stderr, "**line->write() failed\n");
-						goto CLEAN_UP;
-					}
 //					line->Set((unsigned)nPoints, points);
-					fprintf(mappingFile, "%ld\t%ld\n", rec1.tlid, line->dbAddress() );
-	//#endif
-					fflush( stdout );
-					if ((error = tDB.dacInsert(line, line)) != 0)
+					//fprintf(mappingFile, "%ld\t%ld\n", rec1.tlid, line->dbAddress() );
+					fflush(stdout);
+
+					if ((error = tDB.dacInsert(line, line)) != 0)  // Insert the hashed object in the DAC
 					{
 						fprintf(stderr, "**tDB.dacInsert() failed\n");
 						goto CLEAN_UP;
 					}
-					//error = dac.insert(line, line);
 					dbo.Unlock();
 			
 					if ((error = tDB.addToSpatialTree( dbo )) != 0)
@@ -719,13 +757,13 @@ NEXT_LINE :
 						goto CLEAN_UP;
 					}
 					error = line->Set((unsigned)nPoints, points);
-					tDB.TrBegin();
+
+					tDB.TrBegin();		// Do a transaction which writes all the records to the database for the chain
 					if ((error = tDB.TrEnd()) != 0)
 					{
 						fprintf(stderr, "**tDB.TrEnd() failed\n");
 						goto CLEAN_UP;
 					}
-					//error = dac.trend();
 #endif
 				}
 				else
@@ -750,22 +788,22 @@ NEXT_LINE :
 					params.code = cCode;
 					params.border = rec1.side != '\0';
 
-					WriteLine(csvLines, 0, rec1.tlid, points[0], points[nPoints - 1], range, params, nPoints,
-									&points[1]);
+					WriteLine(csvLines, 0, rec1.tlid, points[0], points[nPoints - 1], range, params, nPoints, &points[1]);
 				}
 	    }
 
 	    if( index != 0 )
 	      delete [] index;
 
-	    printf( "\nNumber of lines proccessed: %ld, skipped: %ld\n", nLines, nLinesSkipped );
+	    printf("\nNumber of lines proccessed: %ld, skipped: %ld\n", nLines, nLinesSkipped );
+			fprintf(stderr, "Data Range: %f %f %f %f\n", dataRange.x.min, dataRange.y.min, dataRange.x.max, dataRange.y.max);
 
 	    if( csvLines ) fclose( csvLines );
-	    if( csvBlocks ) fclose( csvBlocks );
-	    if( csvBlocks2 ) fclose( csvBlocks2 );
+	    if( tabBlocks ) fclose( tabBlocks );
+	    if( tabBlocks2 ) fclose( tabBlocks2 );
 	    if( csvPoly ) fclose( csvPoly );
 	    if( inFile2 ) fclose( inFile2 );
-			if (mappingFile) fclose(mappingFile);
+			if (equivFile) fclose(equivFile);
 	  }
 
 	  fclose( inFile1 );
@@ -777,31 +815,23 @@ NEXT_LINE :
 	  {
 	    length = rt1Name.GetLength();
 			rt1Name = rootName + tigerExts[RT4_EXT];
-//	    rt1Name.SetAt( length - 1, '4' );
-	    if( ( inFile1 = ::fopen( TString(rt1Name), "r" ) ) != 0 )
+	    if( (inFile1 = ::fopen( TString(rt1Name), "r" )) != 0)
 	    {
-//			  rt1Name.SetAt( length - 1, '5' );
+			  TigerRec4 rec4;
+				TigerRec5 rec5;
 
-//			  if( ( inFile2 = fopen( rt1Name, "r" ) ) != 0 )
+			  while( rec4.GetNextRec( inFile1 ) > 0 )
 			  {
-			    TigerRec4 rec4;
-				  TigerRec5 rec5;
-
-			    while( rec4.GetNextRec( inFile1 ) > 0 )
-			    {
-					  for( int i = 0; i < rec4.nFeatures; i++ )
-					  {
+					for( int i = 0; i < rec4.nFeatures; i++ )
+					{
 //					    fseek( inFile2, ( rec4.feats[ i ] - 1) * 54, SEEK_SET );
 //					    rec5.GetNextRec( inFile2 );
-							DoNames( csvNames, stateFips, countyFips, rec4.feats[ i ],
-								rec4.tlid, RTSQ + i + 1, rec5.fn );
+						DoNames( csvNames, stateFips, countyFips, rec4.feats[ i ],
+							rec4.tlid, RTSQ + i + 1, rec5.fn );
 //					    DoNames( csvNames, rec4.tlid, RTSQ + i + 1, rec5.fn );
-					  }
-			    }
-//			    fclose( inFile2 );
+					}
 			  }
-//			  else
-//			    printf( "Cannot open %s file\n", (const char *)rt1Name );
+//			    fclose( inFile2 );
 
 			  fclose( inFile1 );
 	    }
@@ -1019,7 +1049,7 @@ NEXT_LINE :
 				std::vector<PolySegment> polySegs;
 
 				int start = 0;
-				DbHash dbHash;
+				GeoDB::Edge::Hash dbHash;
 				while (dirLineIds.size() > 0)
 				{
 					ObjHandle nh;
@@ -1036,7 +1066,7 @@ NEXT_LINE :
 
 					long lastEdgeUserId = dl.id;
 
-					dbHash.tlid = dl.id;
+					dbHash.id = dl.id;
 					err = tDB.dacSearch(DB_EDGE, &dbHash, oh);
 					assert(err == 0);
 					GeoDB::Edge* line = (GeoDB::Edge*)oh.Lock();
@@ -1339,7 +1369,7 @@ NEXT_LINE :
 					//for (int i = ps.end; --i >= ps.start; )
 					{
 						GeoDB::DirLineId& lineId = orderedLines[i];
-						dbHash.tlid = lineId.id;
+						dbHash.id = lineId.id;
 						ObjHandle eh;
 						err = tDB.dacSearch(DB_EDGE, &dbHash, eh);
 						assert(err == 0);
@@ -1629,6 +1659,7 @@ ERR_RETURN :
   return( -1 );
 }
 
+// Census Feature Code Class
 static TigerDB::Classification MapCFCC( const char *cfcc )
 {
   int cfccNum = atoi( &cfcc[1] );
@@ -1641,7 +1672,7 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 	  break;
 
   case 'P':  // Provisional Code - added in Census 2000
-  case 'A' :
+  case 'A' :	// Road
 		switch( cfccNum )
 		{
 			default :
@@ -1744,7 +1775,7 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 		}
 	  break;
 
-	case 'B' :
+	case 'B' :	// Railroad
 		switch( cfccNum )
 		{
 			default :
@@ -1787,7 +1818,7 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 		}
 	  break;
 				  
-	case 'C' :
+	case 'C' :	// Miscellaneous Ground Transportation
 		switch( cfccNum )
 		{
 			default :
@@ -1813,7 +1844,7 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 		}
 	  break;
 
-	case 'D' :
+	case 'D' :	// Landmark
 		switch( cfccNum )
 		{
 			default :
@@ -1989,7 +2020,7 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 		}
 	  break;
 				  
-	case 'E' :
+	case 'E' :	// Physical Feature
 		switch( cfccNum )
 		{
 			default :
@@ -2019,7 +2050,7 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 		}
 	  break;
 				  
-	case 'F' :
+	case 'F' :	// Nonvisible Feature
 		switch( cfccNum )
 		{
 			default :
@@ -2085,7 +2116,7 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 		}
 	  break;
 				  
-	case 'H' :
+	case 'H' :	// Hydrography
 		switch( cfccNum )
 		{
 			default :
@@ -2182,7 +2213,7 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 		}
 	  break;
 
-	case 'X' :
+	case 'X' :	// Not Yet Classified
 		break;
   }
   
@@ -2193,28 +2224,28 @@ static short GetStateFips( const TCHAR *string )
 {
 	wchar_t state[3];
 
-  const char *pos/* = (TCHAR *)string + 5*/;
+  const char *pos;
 
-  if( ( pos = strstr(string, "TGR")) == 0)
+  if( (pos = strstr(string, "TGR")) == 0)
     return( 0 );
 
-	state[ 0 ] = pos[3]/*string[3]*/;
-	state[ 1 ] = pos[4]/*string[4]*/;
-	state[ 2 ] = '\0';
+	state[0] = pos[3];
+	state[1] = pos[4];
+	state[2] = '\0';
 
   return( (short)_wtoi( state ) );
 }
 
 static short GetCountyFips( const TCHAR *string )
 {
-  const char *pos/* = (TCHAR *)string + 5*/;
+  const char *pos;
 
-  if( ( pos = ::strstr( string, "TGR") ) == 0 )
+  if( (pos = ::strstr( string, "TGR")) == 0 )
     return( 0 );
   
 	pos += 5;
 
-  return( (short)atoi( pos ) );
+  return( (short)atoi(pos) );
 }
 
 static long fsize( const TCHAR *fname )
@@ -2405,6 +2436,45 @@ static int FindIdInList(
 	}
 	return -1;
 }
+
+// Compares two coordinates to 6 decimal points of precision
+static bool Equal(XY_t& p1, XY_t& pt2)
+{
+	const double tol = 1.0e-6;
+	double diff = p1.x - pt2.x;
+	if (diff < 0)
+		diff = -diff;
+	if (diff > tol)
+		return false;
+
+	diff = p1.y - pt2.y;
+	if (diff < 0)
+		diff = -diff;
+	if (diff > tol)
+		return false;
+
+	return true;
+}
+
+static bool chainEqual(ObjHandle& oh, unsigned nPts, XY_t pts[], TigerDB::Classification cCode)
+{
+	bool equal = true;
+	TigerDB::Chain *chain = (TigerDB::Chain*)oh.Lock();
+	XY_t sPt, ePt;
+	chain->getNodes(&sPt, &ePt);
+	if (chain->userCode == cCode && ((Equal(sPt, pts[0]) && Equal(ePt, pts[nPts - 1])) ||
+															     (Equal(sPt, pts[nPts - 1]) && Equal(ePt, pts[0]))))
+	{
+		if (nPts != chain->getNumPts())
+			equal = false;
+	}
+	else
+		equal = false;
+	oh.Unlock();
+
+	return equal;
+}
+
 /*
 static bool isPolygonMatch(ObjHandle &poly, std::vector<DirLineId> &polyLines, int start, int end)
 {

@@ -20,9 +20,9 @@ static int MakeBuffer( const TigerRec1 &rec1, char buffer[] )
 	  count += i;
 	}
 	if( rec1.blkls != ' ' )
-	  buffer[ count++ ] = rec1.blkls;
+	  buffer[count++] = rec1.blkls;
 
-	buffer[ count++ ] = DELIMITER;
+	buffer[count++] = DELIMITER;
 	
 	if( rec1.blkr != -1 )
 	{
@@ -30,44 +30,44 @@ static int MakeBuffer( const TigerRec1 &rec1, char buffer[] )
 	  count += i;
 	}
 	if( rec1.blkrs != ' ' )
-	  buffer[ count++ ] = rec1.blkrs;
-	buffer[ count++ ] = DELIMITER;
+	  buffer[count++] = rec1.blkrs;
+	buffer[count++] = DELIMITER;
 
 	if( rec1.ctbnal != -1 )
 	{
-	  i = sprintf( &buffer[ count ], "%d", rec1.ctbnal );
+	  i = sprintf( &buffer[count], "%d", rec1.ctbnal );
 	  count += i;
 	}
-	buffer[ count++ ] = DELIMITER;
+	buffer[count++] = DELIMITER;
 	
 	if( rec1.ctbnar != -1 )
 	{
-	  i = sprintf( &buffer[ count ], "%d", rec1.ctbnar );
+	  i = sprintf( &buffer[count], "%d", rec1.ctbnar );
 	  count += i;
 	}
-	buffer[ count++ ] = DELIMITER;
+	buffer[count++] = DELIMITER;
 
 	if( rec1.countyl != -1 )
 	{
-	  i = sprintf( &buffer[ count ], "%d", rec1.countyl );
+	  i = sprintf( &buffer[count], "%d", rec1.countyl );
 	  count += i;
 	}
-	buffer[ count++ ] = DELIMITER;
+	buffer[count++] = DELIMITER;
 	
 	if( rec1.countyr != -1 )
 	{
-	  i = sprintf( &buffer[ count ], "%d", rec1.countyr );
+	  i = sprintf( &buffer[count], "%d", rec1.countyr );
 	  count += i;
 	}
-	buffer[ count++ ] = '\n';
-	buffer[ count ] = '\0';
+	buffer[count++] = '\n';
+	buffer[count] = '\0';
 
 	return( count );
 }
 
 void DoBlocks( FILE *file, FILE *file2, const TigerRec1 &rec1 )
 {
-  char buffer[ 128 ];
+  char buffer[128];
 
   MakeBuffer( rec1, buffer );
 
