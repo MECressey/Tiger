@@ -158,7 +158,7 @@ int main( int argc, char *argv[] )
   FILE *csvLines = 0,
   	   *tabBlocks = 0,
   	   *tabBlocks2 = 0,
-  	   *csvNames = 0,
+  	   *tabNames = 0,
   	   *csvAddr = 0,
 			 *csvPoly = 0,
   	   *inFile1 = 0,
@@ -289,7 +289,7 @@ int main( int argc, char *argv[] )
 		// Create a GeoDB
 		if (doCreate)
 		{
-			char input[80];
+			//char input[80];
 			double xmin,  // 204
 				xmax,
 				ymax,	//520,
@@ -437,7 +437,7 @@ int main( int argc, char *argv[] )
 	  if( doNames )
 	  {
 			fName = baseName + "n.tab";
-			if ((csvNames = ::fopen( TString(fName), "w" )) == 0)
+			if ((tabNames = ::fopen( TString(fName), "w" )) == 0)
 				printf("** Cannot create file %s\n", (const char*)fName);
 	  }
 
@@ -483,7 +483,7 @@ int main( int argc, char *argv[] )
 							printf( "N: %s, T: %s, F: %ld\n", (const char *)TString(tgrNames.m_name),
 							 (const char *)TString(tgrNames.m_type), tgrNames.m_feat );
 */
-							DoNames( csvNames, stateFips, countyFips, tgrNames.m_feat, rec1.tlid, RTSQ, rec1.fn );
+							DoNames( tabNames, stateFips, countyFips, tgrNames.m_feat, rec1.tlid, RTSQ, rec1.fn );
 							while (!tgrNames.IsEOF())
 								tgrNames.MoveNext();
 							goto NEXT_LINE;
@@ -665,13 +665,14 @@ NEXT_LINE :
 				dataRange.Envelope(mbr);  // Keep the entire data range
 				if (doTigerDB)
  				{
-#if defined(TO_TIGERDB)
+//#if defined(TO_TIGERDB)
 					// Check state boundary lines to see if the line already exists in the database (from another county)
 					if (rec1.countyl != rec1.countyr)
 					{
 						ObjHandle fo;
 
 						DbObject::Id equivId = 0;
+//#if defined(SAVE_FOR_NOW)
 						GeoDB::Edge::Hash dbHash;
 						dbHash.id = rec1.tlid;
 						if ((error = tDB.dacSearch(DB_EDGE, &dbHash, fo)) == 0)	// Sometimes the chains share a common TLID between counties
@@ -683,7 +684,6 @@ NEXT_LINE :
 						}
 						else  // search spatially for the boundary chain
 						{
-
 							GeoDB::Search ss;
 							GeoDB::searchClasses_t searchFilter;
 							searchFilter.set(DB_EDGE);
@@ -710,6 +710,7 @@ NEXT_LINE :
 								}
 							}
 						}
+//#endif
 						if (equivId != 0)
 						{
 							printf("* %ld (%d) is equivalent to %ld\n", rec1.tlid, stateFips, equivId);
@@ -719,7 +720,9 @@ NEXT_LINE :
 					}
 
 					ObjHandle dbo;
-					if( ( error = tDB.NewDbObject(DB_EDGE, dbo)) != 0)
+					// Create a new object in memory and set some of it's data.  An Edge (Chain) is a variable length object, so we
+					// want to create it first before we allocate disk space for it.
+					if ((error = tDB.NewObject(DB_EDGE, dbo)) != 0)
 					{
 						fprintf( stderr,  "**dbOM.newObject failed\n" );
 						goto CLEAN_UP;
@@ -735,11 +738,11 @@ NEXT_LINE :
 					line->userCode = cCode;
 					line->SetName(names, nNames);	// Don't store the actual names in the Chain (retrieve from the SQL database)
 					line->userId = rec1.tlid;			// TLID is unique
-					/*if ((error = line->Write()) != 0)	// We call Write() because the Chain just lives in memory
+					if ((error = line->Write()) != 0)	// We call Write() to assign an object space on the disk
 					{
-						fprintf(stderr, "**line->Write() failed\n");
+						fprintf(stderr, "**DbOM::Write() failed\n");
 						goto CLEAN_UP;
-					}*/
+					}
 //					line->Set((unsigned)nPoints, points);
 					//fprintf(mappingFile, "%ld\t%ld\n", rec1.tlid, line->dbAddress() );
 					fflush(stdout);
@@ -764,7 +767,7 @@ NEXT_LINE :
 						fprintf(stderr, "**tDB.TrEnd() failed\n");
 						goto CLEAN_UP;
 					}
-#endif
+//#endif
 				}
 				else
 				{
@@ -826,16 +829,16 @@ NEXT_LINE :
 					{
 //					    fseek( inFile2, ( rec4.feats[ i ] - 1) * 54, SEEK_SET );
 //					    rec5.GetNextRec( inFile2 );
-						DoNames( csvNames, stateFips, countyFips, rec4.feats[ i ],
+						DoNames( tabNames, stateFips, countyFips, rec4.feats[ i ],
 							rec4.tlid, RTSQ + i + 1, rec5.fn );
-//					    DoNames( csvNames, rec4.tlid, RTSQ + i + 1, rec5.fn );
+//					    DoNames( tabNames, rec4.tlid, RTSQ + i + 1, rec5.fn );
 					}
 			  }
 //			    fclose( inFile2 );
 
 			  fclose( inFile1 );
 	    }
-	    fclose( csvNames );
+	    fclose( tabNames );
 	  }
 //
 //	Process extra addresses

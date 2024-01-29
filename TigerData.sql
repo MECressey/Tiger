@@ -50,7 +50,7 @@ CREATE TABLE TgrNames (
 );
 
 BULK INSERT TgrNames
-FROM 'c:\Work\TIGER\tigercnv\tgr23027t.tab'
+FROM 'c:\Work\TIGER\tigercnv\tgr23013t.tab'
 WITH (
   FIRSTROW = 1,
   FIELDTERMINATOR = '\t',
@@ -59,7 +59,7 @@ WITH (
 );
 
 BULK INSERT [23Names]
-FROM 'c:\Work\Census\Data\Maine-2006\Waldo\tgr23027n.tab'
+FROM 'c:\Work\Census\Data\Maine-2006\Knox\tgr23013n.tab'
 WITH (
   FIRSTROW = 1,
   FIELDTERMINATOR = '\t',
@@ -69,3 +69,6 @@ WITH (
 
 INSERT INTO DistNames (name)
 SELECT DISTINCT name FROM TgrNames;
+
+SELECT DISTINCT name FROM TgrNames
+where county = 27;
