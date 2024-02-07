@@ -5,6 +5,7 @@
 class DbBlocks : public CRecordset
 {
 public:
+	int m_county;
 	long	m_tlid;
 	CString	m_blkl;
 	CString	m_blkr;

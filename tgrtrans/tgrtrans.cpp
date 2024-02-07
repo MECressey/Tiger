@@ -343,8 +343,12 @@ int main( int argc, char *argv[] )
 				goto CLEAN_UP;
 			}
 
+			TopoTools::TopoStats stats;
 			const Range2D range = tDB.getRange();
-			int err = TopoTools::buildTopology(tDB, range);
+			int err = TopoTools::buildTopology(tDB, range, &stats);
+			if (err != 0)
+				fprintf(stderr, "TopoTools::buildTopology() failed: %ld\n", err);
+			printf("  Stats - nEdges: %ld, nNodes: %ld\n", stats.nEdgesRead, stats.nNodesCreated);
 			err = tDB.Close();
 			return 0;
 		}
@@ -497,7 +501,7 @@ int main( int argc, char *argv[] )
 				}
 NEXT_LINE :
 	      if( doBlocks )
-					DoBlocks(tabBlocks, tabBlocks2, rec1);
+					DoBlocks(tabBlocks, tabBlocks2, rec1, countyFips);
 			  if( doAddress )
 					DoAddress( csvAddr, rec1.tlid, 0, rec1.ar );
 #if defined(DO_LATER)
@@ -2441,9 +2445,9 @@ static int FindIdInList(
 }
 
 // Compares two coordinates to 6 decimal points of precision
+/*
 static bool Equal(XY_t& p1, XY_t& pt2)
 {
-	const double tol = 1.0e-6;
 	double diff = p1.x - pt2.x;
 	if (diff < 0)
 		diff = -diff;
@@ -2458,6 +2462,8 @@ static bool Equal(XY_t& p1, XY_t& pt2)
 
 	return true;
 }
+*/
+const double tol = 1.0e-6;
 
 static bool chainEqual(ObjHandle& oh, unsigned nPts, XY_t pts[], TigerDB::Classification cCode)
 {
@@ -2465,8 +2471,8 @@ static bool chainEqual(ObjHandle& oh, unsigned nPts, XY_t pts[], TigerDB::Classi
 	TigerDB::Chain *chain = (TigerDB::Chain*)oh.Lock();
 	XY_t sPt, ePt;
 	chain->getNodes(&sPt, &ePt);
-	if (chain->userCode == cCode && ((Equal(sPt, pts[0]) && Equal(ePt, pts[nPts - 1])) ||
-															     (Equal(sPt, pts[nPts - 1]) && Equal(ePt, pts[0]))))
+	if (chain->userCode == cCode && ((sPt.Equal(pts[0], tol) && ePt.Equal(pts[nPts - 1], tol)) ||
+															     (sPt.Equal(pts[nPts - 1], tol) && ePt.Equal(pts[0], tol))))
 	{
 		if (nPts != chain->getNumPts())
 			equal = false;

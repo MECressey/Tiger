@@ -1,12 +1,13 @@
 CREATE TABLE [MEblocks] (
+  county smallint NOT NULL,
   tlid int NOT NULL,
   blkl varchar(6) NULL,
   blkr varchar(6) NULL,
   trackl int NULL,
   trackr int NULL,
-  countyl smallint NOT NULL,
-  countyr smallint NOT NULL,
-  CONSTRAINT [MENames_PK] PRIMARY KEY(tlid)
+  countyl smallint NULL,
+  countyr smallint NULL,
+  CONSTRAINT [MEBlocks_PK] PRIMARY KEY(tlid,county)
 );
 
 select * from MEblocks

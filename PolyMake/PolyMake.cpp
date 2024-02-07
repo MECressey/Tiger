@@ -40,7 +40,7 @@ static int BlkFind(const CString& blk)
 	return(pos);
 }
 
-int GetWaterLines(CDatabase& db, LPCTSTR blkTable, /*const char* lineTable,
+int GetWaterLines(CDatabase& db, LPCTSTR blkTable, int county, /*const char* lineTable,
 	const char* equivTable,*/ CArray<GeoDB::DirLineId, GeoDB::DirLineId&>& ids)
 {
 	int nLines = 0;
@@ -51,7 +51,9 @@ int GetWaterLines(CDatabase& db, LPCTSTR blkTable, /*const char* lineTable,
 //
 //	Get the blocks that have water on either the left or the right
 //
-		blks.m_strFilter = "blkl like '%99%' OR blkr like '%99%'";
+		//blks.m_strFilter = "blkl like '%99%' OR blkr like '%99%'";
+		blks.m_strFilter.Format(_T("county = %d AND "), county);
+		blks.m_strFilter += _T("(blkl like '%99%' OR blkr like '%99%')");
 		blks.Open(CRecordset::forwardOnly, blkTable, CRecordset::readOnly);
 		while (!blks.IsEOF())
 		{
@@ -514,13 +516,38 @@ int main(int argc, char* argv[])
 	try
 	{
 		CDatabase db;
-		db.SetQueryTimeout(60 * 10);
+		//db.SetQueryTimeout(60 * 10);
 		db.Open(_T("TigerBase"), FALSE, TRUE, _T("ODBC;"), FALSE);
 		CArray<GeoDB::DirLineId, GeoDB::DirLineId&> lineIds;
-		CString baseName = "ME"/*argv[1]*/;
+		CString baseName = "";
 		TigerDB tDB(&db);
 
+		if (argc < 3)
+		{
+			printf("* Invalid arguments: %d\n", argc);
+			return -1;
+		}
+
+
+		int stateFips = ::atoi(argv[2]);
+		switch (stateFips)
+		{
+		case 23:
+			baseName = "ME";
+			break;
+		default:
+			printf("* State %d not supported at this time\n", stateFips);
+			return -1;
+		}
+
 		int err = tDB.Open(TString(argv[1]), 1);
+		if (err != 0)
+		{
+			printf("* Cannot open: %s\n", argv[1]);
+			return -1;
+		}
+
+		int countyFips = ::atoi(argv[3]);
 
 		std::map<int, int> tlidMap;
 #ifdef SAVE_FOR_NOW
@@ -609,7 +636,7 @@ int main(int argc, char* argv[])
 
 			lineIds.SetSize(10000, 1000);
 
-			if ((nLines = GetWaterLines(db, blockTable, lineIds)) <= 0)
+			if ((nLines = GetWaterLines(db, blockTable, countyFips, lineIds)) <= 0)
 			{
 				fprintf(stderr, "Error getting Hydro lines: %s\n", (char *)(LPCTSTR)blockTable);
 				return -1;

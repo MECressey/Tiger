@@ -7,6 +7,7 @@ DbBlocks::DbBlocks(CDatabase* pDB)
 	: CRecordset(pDB)
 {
 	//{{AFX_FIELD_INIT(DbBlocks)
+	m_county = 0;
 	m_tlid = 0;
 	m_trackl = 0;
 	m_trackr = 0;

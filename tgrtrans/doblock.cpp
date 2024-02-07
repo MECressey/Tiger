@@ -5,10 +5,13 @@
 
 const char DELIMITER = '\t';
 
-static int MakeBuffer( const TigerRec1 &rec1, char buffer[] )
+static int MakeBuffer(short countyFips, const TigerRec1 &rec1, char buffer[] )
 {
   int i,
   	  count = 0;
+	i = sprintf(&buffer[count], "%d", countyFips);
+	count += i;
+	buffer[count++] = DELIMITER;
 
 	i = sprintf( &buffer[ count ], "%ld", rec1.tlid );
 	count += i;
@@ -65,11 +68,11 @@ static int MakeBuffer( const TigerRec1 &rec1, char buffer[] )
 	return( count );
 }
 
-void DoBlocks( FILE *file, FILE *file2, const TigerRec1 &rec1 )
+void DoBlocks( FILE *file, FILE *file2, const TigerRec1 &rec1, short countyFips)
 {
   char buffer[128];
 
-  MakeBuffer( rec1, buffer );
+  MakeBuffer(countyFips, rec1, buffer);
 
   if( rec1.blkl != rec1.blkr || rec1.blkls != rec1.blkrs ||
 	  rec1.ctbnal != rec1.ctbnar || rec1.countyl != rec1.countyr ||
