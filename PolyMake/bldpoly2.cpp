@@ -1202,7 +1202,9 @@ int BuildPoly3(
 
 						if (foundPos >= 0)
 						{
-							if (saveListPos < 0 || line->userCode == TigerDB::HYDRO_PerennialShoreline)
+							char currDir = lineIds[foundPos].dir;
+
+							if (saveListPos < 0 || (line->userCode == TigerDB::HYDRO_PerennialShoreline && currDir != saveDir))
 							{
 								saveListPos = foundPos;
 								saveDir = outDir;
