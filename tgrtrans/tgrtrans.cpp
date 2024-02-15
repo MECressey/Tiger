@@ -734,7 +734,7 @@ NEXT_LINE :
 
 					TigerDB::Chain *line = (TigerDB::Chain *)dbo.Lock();
 
-					line->Init();
+					//line->Init();
 					//line->line_coor.init();
 
 					line->setMBR(mbr);
@@ -1441,23 +1441,23 @@ NEXT_LINE :
 			rt1Name = rootName + tigerExts[RT8_EXT];
 //	    rt1Name.SetAt( length - 1, '8' );
 	    if( ( inFile1 = fopen( rt1Name, "r" ) ) == 0 )
-	    {
-			  printf( "Cannot open %s\n", (const char *)rt1Name );
-			  goto ERR_RETURN;
-	    }
-
-	    fName = baseName + "ll.csv";
-	    if( ( csvFile = fopen( fName, "w" ) ) == 0 )
 			{
-			  printf( "Cannot open %s\n", (const char *)fName );
-			  fclose( inFile1 );
-			  goto ERR_RETURN;
+				printf( "Cannot open %s\n", (const char *)rt1Name );
+				goto ERR_RETURN;
+			}
+
+			fName = baseName + "ll.csv";
+			if( ( csvFile = fopen( fName, "w" ) ) == 0 )
+			{
+				printf( "Cannot open %s\n", (const char *)fName );
+				fclose( inFile1 );
+				goto ERR_RETURN;
 			}
 
 			TigerRec8 rec8;
 			while( rec8.GetNextRec( inFile1 ) > 0 )
 			{
-			  DoLMlink( csvFile, rec8 );
+				DoLMlink( csvFile, rec8 );
 			}
 
 			fclose( inFile1 );
@@ -1467,48 +1467,81 @@ NEXT_LINE :
 //
 			rt1Name = rootName + tigerExts[RT7_EXT];
 //	    rt1Name.SetAt( length - 1, '7' );
-	    if( ( inFile1 = fopen( rt1Name, "r" ) ) == 0 )
-	    {
-		  printf( "Cannot open %s\n", (const char *)rt1Name );
-		  goto ERR_RETURN;
-	    }
+			if( ( inFile1 = fopen( rt1Name, "r" ) ) == 0 )
+			{
+			printf( "Cannot open %s\n", (const char *)rt1Name );
+			goto ERR_RETURN;
+			}
 
-	    fName = baseName + "lm.csv";		// landmark area & line features
-	    if( ( csvFile = fopen( fName, "w" ) ) == 0 )
+			fName = baseName + "lm.csv";		// landmark area & line features
+			if( ( csvFile = fopen( fName, "w" ) ) == 0 )
 		{
-		  printf( "Cannot open %s\n", (const char *)fName );
-		  fclose( inFile1 );
-		  goto ERR_RETURN;
+			printf( "Cannot open %s\n", (const char *)fName );
+			fclose( inFile1 );
+			goto ERR_RETURN;
 		}
 
-	    fName = baseName + "lp.csv";			// landmark points
-	    if( ( inFile2 = fopen( fName, "w" ) ) == 0 )
+			fName = baseName + "lp.csv";			// landmark points
+			if( ( inFile2 = fopen( fName, "w" ) ) == 0 )
 			{
-			  printf( "Cannot open %s\n", (const char *)fName );
-			  fclose( inFile1 );
-			  fclose( csvFile );
-			  goto ERR_RETURN;
+				printf( "Cannot open %s\n", (const char *)fName );
+				fclose( inFile1 );
+				fclose( csvFile );
+				goto ERR_RETURN;
 			}
 
 			TigerRec7 rec7;
 			while( rec7.GetNextRec( inFile1 ) > 0 )
 			{
-			  if( rec7.lalong == -1 && rec7.lalat == -1 )
-			    DoLMarea( csvFile, rec7 );
-			  else
-			    DoLMpoint( inFile2, rec7 );
+				if( rec7.lalong == -1 && rec7.lalat == -1 )
+					DoLMarea( csvFile, rec7 );
+				else
+					DoLMpoint( inFile2, rec7 );
 			}
 
 			fclose( inFile1 );
 			fclose( inFile2 );
 			fclose( csvFile );
 */
-	  }
+		}
 
 		if (doGNIS)
 		{
-			FILE* gnisFile = 0;
+			FILE *gnisFile = 0,
+				   *nameFile = 0;
+
+			if (argc < 5)
+			{
+				printf("Invalid number of arguments %d\n", argc);
+				goto ERR_RETURN;
+			}
+
+			int argLen = ::strlen(argv[4]);
+			if (argLen % 3 != 0)
+			{
+				printf("County FIPS are specified in multiples of 3 characters: %d\n", argLen);
+				goto ERR_RETURN;
+			}
+
+			std::vector<std::string> countyList;
+			int nCountyFips = argLen / 3;
+			int startPos = 0;
+			for (int i = 0; i < nCountyFips; i++)
+			{
+				char saveChar = argv[4][startPos + 3];
+				argv[4][startPos + 3] = '\0';
+				std::string fips(&argv[4][startPos]);
+				countyList.push_back(fips);
+				argv[4][startPos + 3] = saveChar;
+				startPos += 3;
+			}
+
 			error = tDB.Open(TString(argv[3]), 1);
+			if (error != 0)
+			{
+				printf("Cannot open GDB %s\n", argv[3]);
+				goto ERR_RETURN;
+			}
 
 			std::string county = "Waldo"/*argv[4]*/;  // Maybe support "ALL"
 			//
@@ -1516,9 +1549,24 @@ NEXT_LINE :
 			//
 			if ((gnisFile = ::fopen(argv[1], "r")) == 0)
 			{
+				tDB.Close();
 				printf("Cannot open %s\n", argv[1]);
 				goto ERR_RETURN;
 			}
+
+			char fName[128];
+			sprintf(fName, "GNISDomesticNames-%s.tab", argv[4]);
+			//std::string fName = "GNIS" + argv[4] + ".tab";
+			//fName.
+			if ((nameFile = ::fopen(fName, "w")) == 0)
+			{
+				tDB.Close();
+				::fclose(gnisFile);
+				printf("Cannot open output file: %s\n", fName);
+				goto ERR_RETURN;
+			}
+
+			fprintf(nameFile, "feature_id\tstate_fips\tcounty_fips\tfeature_name\n");
 
 			char record[350];
 			::fgets(record, sizeof(record) - 1, gnisFile);  // Read header record
@@ -1527,17 +1575,18 @@ NEXT_LINE :
 			{
 				std::vector<std::string> split;
 				splitString(record, '|', split);
-				//if (strcmp(split[5].c_str(), "Waldo") != 0)
-				if (county != split[5])
+				if (std::find(countyList.begin(), countyList.end(), split[6]) == countyList.end())
+				//if (county != split[5])
 					continue;
 				count++;
+				fprintf(nameFile, "%s\t%s\t%s\t%s\n", split[0].c_str(), split[4].c_str(), split[6].c_str(), split[1].c_str());
 				int size = split.size();
 				int id = atoi(split[0].c_str());
 				double lat = atof(split[12].c_str());
 				double lon = atof(split[13].c_str());
 				TigerDB::GNISFeatures fc = MapFeatureClassToCode(split[2]);
 				//printf(record);
-
+//#if defined(TEMP)
 				ObjHandle po;
 				if ((error = tDB.NewDbObject(DB_POINT, po)) != 0)
 				{
@@ -1563,10 +1612,12 @@ NEXT_LINE :
 				if ((error = tDB.TrBegin()) == 0)
 					error = tDB.TrEnd();
 				assert(error == 0);
+//#endif
 			}
 
 			printf("Read %ld lines from %s\n", count, argv[1]);
 			::fclose(gnisFile);
+			::fclose(nameFile);
 		}
 
 #ifdef DO_LATER

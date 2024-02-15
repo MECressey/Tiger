@@ -72,4 +72,4 @@ INSERT INTO DistNames (name)
 SELECT DISTINCT name FROM TgrNames;
 
 SELECT DISTINCT name FROM TgrNames
-where county = 27;
+where county = 13;
