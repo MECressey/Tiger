@@ -691,7 +691,7 @@ NEXT_LINE :
 							GeoDB::Search ss;
 							GeoDB::searchClasses_t searchFilter;
 							searchFilter.set(DB_EDGE);
-							tDB.Init(mbr, searchFilter, &ss);
+							tDB.InitSearch(&ss, mbr, searchFilter);
 							while ((error = tDB.getNext(&ss, &fo)) == 0)
 							{
 								GeoDB::Edge* edge = (GeoDB::Edge*)fo.Lock();

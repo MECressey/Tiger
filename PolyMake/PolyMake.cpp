@@ -218,7 +218,7 @@ static int addNode(
 	bool found = false;
 	GeoDB::searchClasses_t classFilter;
 	classFilter.set(DB_NODE);
-	db.Init(range, classFilter, &ss);
+	db.InitSearch(&ss, range, classFilter);
 	while (db.getNext(&ss, &fo) == 0)
 	{
 		GeoDB::SpatialObj* spatialObj = (GeoDB::SpatialObj*)fo.Lock();
