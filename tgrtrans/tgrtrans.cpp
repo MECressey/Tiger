@@ -337,7 +337,8 @@ int main( int argc, char *argv[] )
 		// Build topology
 		if (doTopo)
 		{
-			if (doTigerDB && (error = tDB.Open(TString(argv[3]), 1)) != 0)
+			std::string version;
+			if (doTigerDB && (error = tDB.Open(TString(argv[3]), version, 1)) != 0)
 			{
 				fprintf(stderr, "* Cannot open Tiger DB: %s\n", argv[3]);
 				goto CLEAN_UP;
@@ -396,7 +397,8 @@ int main( int argc, char *argv[] )
 		  fName.Format(_T("%d_Equiv.tab"), stateFips);
 		  equivFile = ::fopen(TString(fName), "w+");
 #if defined(TO_TIGERDB)
-      if( doTigerDB && (error = tDB.Open( TString(argv[3]), 1)) != 0 )
+			std::string version;
+      if( doTigerDB && (error = tDB.Open( TString(argv[3]), version, 1)) != 0 )
 			{
 				fprintf( stderr, "* Cannot open Tiger DB: %s\n", argv[ 3 ] );
 				goto CLEAN_UP;
@@ -871,7 +873,8 @@ NEXT_LINE :
 	  {
 			FILE *csvFile = 0;
 			printf("PROCESSING LANDMARK POLYGONS\n");
-			error = tDB.Open(TString(argv[3]), 1);
+			std::string version;
+			error = tDB.Open(TString(argv[3]), version, 1);
 
 //
 //	Load record "8" - Landmark links into memory
@@ -1536,7 +1539,8 @@ NEXT_LINE :
 				startPos += 3;
 			}
 
-			error = tDB.Open(TString(argv[3]), 1);
+			std::string version;
+			error = tDB.Open(TString(argv[3]), version, 1);
 			if (error != 0)
 			{
 				printf("Cannot open GDB %s\n", argv[3]);
@@ -1717,7 +1721,7 @@ ERR_RETURN :
   return( -1 );
 }
 
-// Census Feature Code Class
+// Census Feature Code Class - based on 2006 classification codes
 static TigerDB::Classification MapCFCC( const char *cfcc )
 {
   int cfccNum = atoi( &cfcc[1] );
@@ -1737,7 +1741,7 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 			  fprintf( stderr,  "*MapCFCC - Unknown CFCC A: %d\n", cfccNum );
 				break;
 
-			case 0 :
+			case 0 :  // Road feature; classification unknown or not elsewhere classified
 			case 1 :
 			case 2 :
 			case 3 :
@@ -1749,30 +1753,35 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 			case 10 :
 				code = TigerDB::ROAD_MajorCategoryUnknown;
 				break;
-
-			case 11	:
-			case 12 :
-			case 13 :
-			case 14 :
-			case 15 :
-			case 16 :
-			case 17 :
-			case 18 :
+      
+      // A1 roads
+			case 11	: // Primary road with limited access or interstate highway, unseparated
+			case 12 : // unseparated, in tunnel
+			case 13 : // unseparated, underpassing
+			case 14 : // unseparated, with rail line in center
+			case 15 : // separated
+			case 16 : // separated, in tunnel
+			case 17 : // separated, underpassing
+			case 18 : // separated, with rail line in center
+      case 19 : // bridge
 				code = TigerDB::ROAD_PrimaryLimitedAccess;
 				break;
-
-			case 21 :
-			case 22 :
-			case 23 :
-			case 24 :
-			case 25 :
-			case 26 :
-			case 27 :
-			case 28 :
+      
+      // A2 roads
+			case 21 : // Primary road without limited access, US highways, unseparated  // 
+			case 22 : // unseparated, in tunnel
+			case 23 : // unseparated, underpassing
+			case 24 : // with rail line in center
+			case 25 : // separated
+			case 26 : // separated, in tunnel
+			case 27 : // separated, underpassing
+			case 28 : // separated, with rail line in center
+      case 29 : // bridge
 				code = TigerDB::ROAD_PrimaryUnlimitedAccess;
 				break;
-
-			case 31 :
+      
+      // A3 roads
+			case 31 : // Secondary and connecting road, state and county highways, unseparated
 			case 32 :
 			case 33 :
 			case 34 :
@@ -1780,10 +1789,12 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 			case 36 :
 			case 37 :
 			case 38 :
+      case 39 : 
 				code = TigerDB::ROAD_SecondaryAndConnecting;
 				break;
 
-			case 41 :
+      // A4 roads
+			case 41 : // Local, neighborhood, and rural road, city street, unseparated
 			case 42 :
 			case 43 :
 			case 44 :
@@ -1791,16 +1802,19 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 			case 46 :
 			case 47 :
 			case 48 :
+      case 49 : 
 				code = TigerDB::ROAD_LocalNeighborhoodAndRural;
 				break;
 
-			case 51 :
+      // A5 roads
+			case 51 : // Vehicular trail, road passable only by 4WD vehicle, unseparated
 			case 52 :
 			case 53 :
 				code = TigerDB::ROAD_VehicularTrail;
 				break;
 
-			case 60 :
+      // A6 roads
+			case 60 : // Special road feature, major category used when the minor category could not be determined
 				code = TigerDB::ROAD_SpecialCharacteristics;
 				break;
 
@@ -1823,13 +1837,23 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 			case 65 :
 				code = TigerDB::ROAD_FerryCrossing;
 				break;
+        
+      case 66 : // Gated barrier to travel
+      case 67 : // Toll booth barrier to travel
+        code = TigerDB::ROAD_BarrierToTravel;
+        break;
 
-			case 71 :
-			case 72 :
-			case 73 :
-			case 74 :
+      // A7 roads
+      case 70 : // Other thoroughfare, major category used when the minor category could not be determined
+			case 71 : // Walkway or trail for pedestrians, usually unnamed
+			case 72 : // Stairway, stepped road for pedestrians, usually unnamed
+			case 73 : // Alley, road for service vehicles, usually unnamed, located at the rear of buildings and property
+			case 74 : // Private road or drive for service vehicles, usually privately owned and unnamed.
 				code = TigerDB::ROAD_OtherThoroughfare;
 				break;
+      case 75 : // Internal U.S. Census Bureau use
+        code = TigerDB::ROAD_InternalUSCensusBureau;
+        break;
 		}
 	  break;
 
@@ -1839,36 +1863,42 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 			default :
 			  fprintf( stderr,  "*MapCFCC - Unknown CFCC B: %d\n", cfccNum );
 				break;
-
+    case 0 :  // Railroad feature; classification unknown or not elsewhere classified
 		case 1 :
 		case 2 :
 		case 3 :
 			code = TigerDB::RR_MajorCategoryUnknown;
 			break;
 
-		case 11 :
+		case 11 : // Railroad main track, not in tunnel or underpassing
 		case 12 :
 		case 13 :
+    case 14 : // Abandoned/inactive rail line with tracks present
+    case 15 : // Abandoned rail line with grade, but no tracks
+    case 16 : // Abandoned rail line with track and grade information unknown
+    case 19 : // Railroad main track, bridge
 			code = TigerDB::RR_MainLine;
 			break;
 
-		case 21 :
+		case 21 : // Railroad spur track, not in tunnel or underpassing
 		case 22 :
 		case 23 :
+    case 29 :
 			code = TigerDB::RR_Spur;
 			break;
 
-		case 31 :
+		case 31 : // Railroad yard track, not in tunnel or underpassing
 		case 32 :
 		case 33 :
+    case 39 : // Railroad yard track, bridge
 			code = TigerDB::RR_Yard;
 			break;
 
-		case 40 :
-			code = TigerDB::RR_SpecialCharacteristics;
+		case 40 : // Railroad ferry crossing, the representation of a route over water used by ships carrying train cars to connecting railroads on opposite shores
+			code = TigerDB::RR_FerryCrossing;
 			break;
 
-		case 50 :
+		case 50 : // Other rail line; major category used alone when the minor category could not be determined
 		case 51 :
 		case 52 :
 			code = TigerDB::RR_OtherThoroughfare;
@@ -1895,9 +1925,15 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 				code = TigerDB::MGT_PowerLine;
 				break;
 
-			case 30 :
-			case 31 :
+			case 30 : // Other ground transportation that is not a pipeline or a power transmission
 				code = TigerDB::MGT_SpecialCharacteristics;
+				break;
+
+			case 31 : // Aerial tramway, monorail, or ski lift
+				code = TigerDB::MGT_AerialTramway;
+				break;
+      case 32 : // Pier/dock a platform built out from the shore into the water and supported by piles
+				code = TigerDB::MGT_PierDock;
 				break;
 		}
 	  break;
@@ -1920,38 +1956,31 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 			case 20 :
 				code = TigerDB::LM_MultihouseholdOrTransientQuarters;
 				break;
-
-			case 21 :
-			case 22 :
-			case 26 :
+			case 21 : // Apartment building or complex
+			case 22 : // Rooming or boarding house
+			case 26 : // Housing facility for workers
 				code = TigerDB::LM_ApartmentBuildingOrBoardingHouse;
 				break;
-
 			case 23 :
 				code = TigerDB::LM_MobileHomePark;
 				break;
-
 			case 24 :
 				code = TigerDB::LM_Marina;
 				break;
-
 			case 25 :
 				code = TigerDB::LM_CrewOfVessel;
 				break;
-
-			case 27 :
+			case 27 : // Hotel, motel, resort, spa, hostel, YMCA, or YWCA
 				code = TigerDB::LM_HotelOrMotel;
 				break;
-
 			case 28 :
 				code = TigerDB::LM_Campground;
 				break;
-
 			case 29 :
 				code = TigerDB::LM_ShelterOrMission;
 				break;
 
-			case 30 :
+			case 30 : // Custodial facility; major category used alone when the minor category could not be determined
 				code = TigerDB::LM_CustodialFacility;
 				break;
 			case 31 :
@@ -1960,23 +1989,18 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 			case 32 :
 				code = TigerDB::LM_HalfwayHouse;
 				break;
-
 			case 33 :
 				code = TigerDB::LM_NursingHome;
 				break;
-
 			case 34 :
 				code = TigerDB::LM_CountyHome;
 				break;
-
 			case 35 :
 				code = TigerDB::LM_Orphanage;
 				break;
-
 			case 36 :
 				code = TigerDB::LM_Jail;
 				break;
-
 			case 37 :
 				code = TigerDB::LM_FederalOrStatePrison;
 				break;
@@ -1996,7 +2020,17 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 			case 44 :
 				code = TigerDB::LM_ReligiousInstitution;
 				break;
+      case 45 : // Museum including visitor center, cultural center, or tourist attraction
+				code = TigerDB::LM_Museum;
+				break;
+      case 46 : // Community Center
+				code = TigerDB::LM_CommunityCenter;
+				break;
+      case 47 : // Library
+				code = TigerDB::LM_Library;
+				break;
 
+			// Transportation terminal
 			case 50 :
 				code = TigerDB::LM_TransportationTerminal;
 				break;
@@ -2015,7 +2049,17 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 			case 55 :
 				code = TigerDB::LM_SeaplaneAnchorage;
 				break;
+      case 56 : // Airport Intermodel Transportation Hub/Terminal site that allows switching of differing modes of transportation
+				code = TigerDB::LM_AirportIntermodelTransportationHub;
+				break;
+      case 57 : // Airport-Statistical Representation used as part of urban area delineation
+				code = TigerDB::LM_AirportStatisticalRepresentation;
+				break;
+      case 58 : // Park and ride facility/parking lot
+				code = TigerDB::LM_ParkAndRide;
+				break;
 
+      // Employment Center
 			case 60 :
 				code = TigerDB::LM_Employmentcenter;
 				break;
@@ -2037,14 +2081,43 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 			case 66 :
 				code = TigerDB::LM_OtherEmploymentCenter;
 				break;
+      case 67 : // Convention center
+				code = TigerDB::LM_ConventionCenter;
+				break;
 
+      // Towers, Monuments, and Other Vertical Structures
 			case 70 :
 				code = TigerDB::LM_Tower;
 				break;
 			case 71 :
 				code = TigerDB::LM_LookoutTower;
 				break;
+      case 72 : // Transmission tower including cell, radio, and TV
+				code = TigerDB::LM_TransmissionTower;
+				break;
+      case 73 : // Water tower
+				code = TigerDB::LM_WaterTower;
+				break;
+      case 74 : // Lighthouse beacon
+				code = TigerDB::LM_LighthouseBeacon;
+				break;
+			case 75 : // Tank/tank farm with a number of liquid
+				code = TigerDB::LM_Tank;
+				break;
+      case 76 : // Windmill farm
+				code = TigerDB::LM_WindmillFarm;
+				break;
+      case 77 : // Solar farm
+				code = TigerDB::LM_SolarFarm;
+				break;
+      case 78 : // Monument or memorial
+				code = TigerDB::LM_MonumentMemorial;
+				break;
+      case 79 : // Survey or boundary memorial
+				code = TigerDB::LM_SurveyBoundaryMemorial;
+				break;
 
+      // Open Space This category contains areas of open space with no inhabitants
 			case 80 :
 				code = TigerDB::LM_OpenSpace;
 				break;
@@ -2063,22 +2136,36 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 			case 85 :
 				code = TigerDB::LM_StateOrLocalPark_Forest;
 				break;
+      case 86 : // Zoo
+				code = TigerDB::LM_Zoo;
+				break;
+      case 87 : // Vineyard, winery, orchard or other agricultural or horticultural establishment
+				code = TigerDB::LM_VineyardWineryOrchard;
+				break;
+      case 88 : // Landfill, incinerator, dump, spoil
+				code = TigerDB::LM_LandfillDump;
+				break;
 
+      // Special Purpose Landmark (unclassified)
 			case 90 :
 				code = TigerDB::LM_SpecialPurpose;
 				break;
-
 			case 91 :
 				code = TigerDB::LM_POBox_ZipCode;
 				break;
-
 			case 92 :
 				code = TigerDB::LM_Urbanizacion;
+				break;
+			case 93:
+			case 94:
+			case 95:
+			case 96 : // Internal U.S. Census Bureau use
+				code = TigerDB::LM_InternalUSCensusBureau;
 				break;
 		}
 	  break;
 				  
-	case 'E' :	// Physical Feature
+	case 'E' :	// Feature Class E, Physical Feature
 		switch( cfccNum )
 		{
 			default :
@@ -2105,10 +2192,22 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 			case 23 :
 				code = TigerDB::PF_Island;
 				break;
+      case 24 : // Levee, an embankment
+				code = TigerDB::PF_Levee;
+				break;
+      case 25 : // Marsh/Swamp
+				code = TigerDB::PF_MarshSwamp;
+				break;
+      case 26 : // Quarry, open pit mine or mine
+				code = TigerDB::PF_QuarryMine;
+				break;
+      case 27 : // Dam
+				code = TigerDB::PF_Dam;
+				break;
 		}
 	  break;
 				  
-	case 'F' :	// Nonvisible Feature
+	case 'F' :	// Nonvisible Features
 		switch( cfccNum )
 		{
 			default :
@@ -2119,16 +2218,20 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 				code = TigerDB::NVF_BoundaryClassificationUnknown;
 				break;
 
-			case 10 :
-			case 11 :
-			case 12 :
-			case 13 :
+			case 10 : // Nonvisible jurisdictional boundary of a legal or administrative entity
+			case 11 :	// Offset boundary of a legal entity
+			case 12 :	// Corridor boundary of a legal entity
+			case 13 :	// Nonvisible superseded 2000 legal boundary
 			case 14 :
 			case 15 :
 			case 16 :
+      case 17 : // Nonvisible State Legislative District boundary
+      case 18 : // Nonvisible Congressional District boundary
+      case 19 : // Nonvisible corrected 2000 legal boundary
 				code = TigerDB::NVF_LegalOrAdministrativeBoundary;
 				break;
 
+			// Nonvisible Features for Database Topology
 			case 20 :
 			case 21 :
 			case 22 :
@@ -2144,17 +2247,25 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 				code = TigerDB::NVF_Centerline;
 				break;
 
+			//	Property Line
 			case 40 :
 				code = TigerDB::NVF_PropertyLine;
+				break;
+			case 41:
+				code = TigerDB::NVF_PublicLandSurveySystem;
 				break;
 
 			case 50 :
 				code = TigerDB::NVF_ZIPCodeBoundary;
 				break;
-
-			case 60 :		// Map edge
+			case 52:
+				code = TigerDB::NVF_InternalUSCensusBureau;
 				break;
 
+			case 60 :		// Map edge (not in 2006?)
+				break;
+
+			//	Nonvisible Statistical Boundary
 			case 70 :
 			case 71 :
 			case 72 :
@@ -2163,7 +2274,8 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 				code = TigerDB::NVF_StatisticalBoundary;
 				break;
 
-			case 80 :
+			// Nonvisible Other Tabulation Boundary
+			case 80 : // Nonvisible Other Tabulation Boundary
 			case 81 :
 			case 82 :
 			case 83 :
@@ -2171,10 +2283,19 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 			case 85 :
 				code = TigerDB::NVF_OtherTabulationBoundary;
 				break;
+      case 86 : // Internal U.S. Census Bureau use
+				code = TigerDB::NVF_InternalUSCensusBureau;
+				break;
+      case 87 : // Oregon urban growth area boundary
+				code = TigerDB::NVF_OregonUrbanAreaBoundary;
+				break;
+      case 88 : // Current statistical area boundary
+				code = TigerDB::NVF_CurrentStatisticalAreaBoundary;
+				break;
 		}
 	  break;
 				  
-	case 'H' :	// Hydrography
+	case 'H' :	// Feature Class H, Hydrography
 		switch( cfccNum )
 		{
 			default :
@@ -2190,8 +2311,9 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 			case 2 :
 				code = TigerDB::HYDRO_IntermittentShoreline;
 				break;
-			
-			case 10 :
+
+			// Naturally Flowing Water Features
+			case 10 : // Stream or river; major category used when the minor category could not be determined
 			case 11 :
 				code = TigerDB::HYDRO_PerennialStream;
 				break;
@@ -2202,14 +2324,16 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 				code = TigerDB::HYDRO_BraidedStream;
 				break;
 
-			case 20 :
-			case 21 :
+			// Man-Made Channel to Transport Water
+			case 20 :  // Canal, ditch, or aqueduct
+			case 21 : // Perennial canal, ditch, or aqueduct; major category used when the minor category could not be determined
 				code = TigerDB::HYDRO_PerennialCanalDitchOrAqueduct;
 				break;
 			case 22 :
 				code = TigerDB::HYDRO_IntermittentCanalDitchOrAqueduct;
 				break;
 
+			// Inland Body of Water
 			case 30 :
 			case 31 :
 				code = TigerDB::HYDRO_PerennialLakeOrPond;
@@ -2218,14 +2342,19 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 				code = TigerDB::HYDRO_IntermittentLakeOrPond;
 				break;
 
-			case 40 :
-			case 41 :
+			// Man-Made Body of Water
+			case 40 : // Reservoir; major category used when the minor category could not be determined
+			case 41 : // Perennial reservoir
 				code = TigerDB::HYDRO_PerennialReservoir;
 				break;
 			case 42 :
 				code = TigerDB::HYDRO_IntermittentReservoir;
 				break;
+      case 43: // Treatment Pond
+				code = TigerDB::HYDRO_TreatmentPond;
+				break;
 
+			// Seaward Body of Water
 			case 50 :
 			case 51 :
 				code = TigerDB::HYDRO_BayEstuaryGulfOrSound;
@@ -2234,20 +2363,21 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 				code = TigerDB::HYDRO_SeaOrOcean;
 				break;
 
+			// Body of Water in a Man-Made Excavation
 			case 60 :
 				code = TigerDB::HYDRO_GravelPitOrQuarry;
 				break;
-
-			case 70 :
-			case 74 :				// Census water boundary - separates inland from coastal
+        
+      // Nonvisible Definition Between Water Bodies
+			case 70 : // Nonvisible water area definition boundary; used to separate named water areas
 				code = TigerDB::NVF_WaterAreaDefinitionBoundary;
 				break;
 
-			case 71 :
+			case 71 : // USGS closure line; used as a maritime shoreline
 				code = TigerDB::NVF_USGSClosureLine;
 				break;
 
-			case 72 :
+			case 72 : // Census water center line; computed to use as a median positional boundary
 				code = TigerDB::NVF_CensusWaterCenterLine;
 				break;
 
@@ -2255,16 +2385,23 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 				code = TigerDB::NVF_CensusWaterBoundary12Mile;
 				break;
 
-			case 75 :
+			case 74:	// Census water boundary separating inland from coastal or Great Lakes
+				code = TigerDB::HYDRO_WaterBoundaryInlandVsCoastal;
+				break;
+
+			case 75 : // Census water boundary separating coastal water from territorial sea at the 3-mile limit
 				code = TigerDB::NVF_CensusWaterBoundary3Mile;
 				break;
 
-			case 76:
+			case 76:  // Artificial path through double line hydrography
 			case 77:
 				code = TigerDB::NVF_ArtificialPath;
 				break;
 
+			// Special Water Feature
 			case 80:  // Special water feature; major category used when the minor category could not be determined
+				code = TigerDB::HYDRO_SpecialWaterFeature;
+				break;
 			case 81 :
 				code = TigerDB::HYDRO_Glacier;
 				break;
