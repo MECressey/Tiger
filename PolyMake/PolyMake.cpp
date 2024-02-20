@@ -475,7 +475,7 @@ int AddClosureLines(
 		int err = db.Read(it->second, oh);
 		TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
 		assert(it->first == line->userId/*GetTLID()*/);
-		if (line->userCode == TigerDB::NVF_USGSClosureLine)
+		if (line->userCode == TigerDB::HYDRO_USGSClosureLine)
 		{
 			int i;
 			long tlid = it->first;
@@ -539,8 +539,8 @@ int main(int argc, char* argv[])
 			printf("* State %d not supported at this time\n", stateFips);
 			return -1;
 		}
-
-		int err = tDB.Open(TString(argv[1]), 1);
+		std::string version;
+		int err = tDB.Open(TString(argv[1]), version, 1);
 		if (err != 0)
 		{
 			printf("* Cannot open: %s\n", argv[1]);

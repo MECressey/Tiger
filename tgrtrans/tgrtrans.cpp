@@ -523,9 +523,11 @@ NEXT_LINE :
 					     rec1.ctbnal != rec1.ctbnar || rec1.countyl != rec1.countyr ||
 					     rec1.statel != rec1.stater) ||
 					(rec1.side != '\0') ||
-					(rec1.cfcc[0] == 'A' || rec1.cfcc[0] == 'B' || rec1.cfcc[0] == 'F' || rec1.cfcc[0] == 'H' || rec1.cfcc[0] == 'C')))
+					(rec1.cfcc[0] == 'A' || rec1.cfcc[0] == 'B' || rec1.cfcc[0] == 'F' || rec1.cfcc[0] == 'H' || rec1.cfcc[0] == 'C'
+							|| rec1.cfcc[0] == 'P' || rec1.cfcc[0] == 'D')))
 				{
 					nLinesSkipped++;
+					printf("  * Skipped %ld with FC: %s\n", rec1.tlid, rec1.cfcc);
 					continue;
 				}
 
@@ -982,7 +984,10 @@ NEXT_LINE :
 				std::vector<GeoDB::DirLineId> dirLineIds;
 				if (rec7.lalong != -1 || rec7.lalat != -1)  // Point Landmarks
 					continue;
-				if (rec7.cfcc[0] != 'H')  // Temporary
+				if (rec7.cfcc[0] != 'D')  // Temporary - only process landmark
+					continue;
+				int cfccNum = atoi(&rec7.cfcc[1]);
+				if (cfccNum != 85)				// Temp - only process parks
 					continue;
 				std::multimap<int, LMLink>::iterator it = llMap.find(rec7.land);
 				if (it == llMap.end())
@@ -1926,7 +1931,7 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 				break;
 
 			case 30 : // Other ground transportation that is not a pipeline or a power transmission
-				code = TigerDB::MGT_SpecialCharacteristics;
+				code = TigerDB::RR_FerryCrossing;
 				break;
 
 			case 31 : // Aerial tramway, monorail, or ski lift
@@ -2128,10 +2133,10 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 				code = TigerDB::LM_Cemetery;
 				break;
 			case 83 :
-				code = TigerDB::LM_NationalParkOrForest;
+				code = TigerDB::LM_NationalParkService;
 				break;
 			case 84 :
-				code = TigerDB::LM_OtherFederalLand;
+				code = TigerDB::LM_NationalForestOrOther;
 				break;
 			case 85 :
 				code = TigerDB::LM_StateOrLocalPark_Forest;
@@ -2151,7 +2156,7 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 				code = TigerDB::LM_SpecialPurpose;
 				break;
 			case 91 :
-				code = TigerDB::LM_POBox_ZipCode;
+				code = TigerDB::LM_InternalUSCensusBureau;
 				break;
 			case 92 :
 				code = TigerDB::LM_Urbanizacion;
@@ -2370,19 +2375,19 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
         
       // Nonvisible Definition Between Water Bodies
 			case 70 : // Nonvisible water area definition boundary; used to separate named water areas
-				code = TigerDB::NVF_WaterAreaDefinitionBoundary;
+				code = TigerDB::HYDRO_WaterAreaDefinitionBoundary;
 				break;
 
 			case 71 : // USGS closure line; used as a maritime shoreline
-				code = TigerDB::NVF_USGSClosureLine;
+				code = TigerDB::HYDRO_USGSClosureLine;
 				break;
 
 			case 72 : // Census water center line; computed to use as a median positional boundary
-				code = TigerDB::NVF_CensusWaterCenterLine;
+				code = TigerDB::HYDRO_CensusWaterCenterLine;
 				break;
 
 			case 73 :
-				code = TigerDB::NVF_CensusWaterBoundary12Mile;
+				code = TigerDB::HYDRO_CensusWaterBoundary12Mile;
 				break;
 
 			case 74:	// Census water boundary separating inland from coastal or Great Lakes
@@ -2390,12 +2395,12 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 				break;
 
 			case 75 : // Census water boundary separating coastal water from territorial sea at the 3-mile limit
-				code = TigerDB::NVF_CensusWaterBoundary3Mile;
+				code = TigerDB::HYDRO_CensusWaterBoundary3Mile;
 				break;
 
 			case 76:  // Artificial path through double line hydrography
 			case 77:
-				code = TigerDB::NVF_ArtificialPath;
+				code = TigerDB::HYDRO_ArtificialPath;
 				break;
 
 			// Special Water Feature

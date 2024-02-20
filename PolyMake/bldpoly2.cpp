@@ -1024,14 +1024,11 @@ static int FindIdInList(
 
 int BuildPoly3(
 	TigerDB& tDB,
-	//std::map<int, int>& tlidMap,
 	const char* polyName,
 	unsigned polyDfcc,
 	long polyId,
 	CArray<GeoDB::DirLineId, GeoDB::DirLineId&> &lineIds,
 	int nLines,
-	//LineTable& lTable,
-	//NodeTable& nTable,
 	int stateCode,
 	const char* name,
 	long* newId,
@@ -1060,7 +1057,7 @@ int BuildPoly3(
 		START_NEW_POLY:
 			DbHash dbHash;
 			ObjHandle nh;
-			BOOL allWater = TRUE;
+			//BOOL allWater = TRUE;
 			int lineCount = 0;
 			long lineId = 0;
 			int side = 0;
@@ -1068,8 +1065,6 @@ int BuildPoly3(
 				ePt;
 			long startId = 0;
 			int lastCode = 0;
-			//GeoLine* currLine = 0;
-			//PolyNode* node = 0;
 			BOOL backTracking = FALSE;
 			XY_t prevPt;
 			DbObject::Id lastId = 0;
@@ -1091,7 +1086,7 @@ int BuildPoly3(
 					err = tDB.dacSearch(DB_EDGE, &dbHash, oh);
 					if (err != 0)
 					{
-						fprintf(stderr, "* BuildPoly3: cannot find line: %ld\n", startId);
+						fprintf(stdout, "* BuildPoly3: cannot find line: %ld\n", startId);
 						nPolys = -1;
 						goto ERR_RETURN;
 					}
@@ -1126,9 +1121,6 @@ int BuildPoly3(
 					}
 					assert(err == 0);
 
-					//if( currLine->cfcc[ 0 ] != 'H' )
-					//  allWater = FALSE;
-
 					lid.id = 0;
 					lineIds.SetAt(i, lid);
 					oh.Unlock();
@@ -1157,7 +1149,6 @@ int BuildPoly3(
 							xcom = (double)sPt.x,
 							ycom = (double)sPt.y,
 							rval = 0.0;
-			//Range2D mbr;
 			//
 			//	Loop till the area closes
 			//
@@ -1167,14 +1158,8 @@ int BuildPoly3(
 				START_OVER :
 #endif
 				int count = 0;
-//				double angle = ePt.Angle(prevPt);
 				int j;
 				int saveListPos;
-				//GeoLine* foundLine = 0;
-				//
-				//	Get all other lines sharing this end point
-				//
-				//GeoDB::Node * node = (GeoDB::Node*)nh.Lock();
 				ObjHandle eh;
 				GeoDB::dir_t outDir,
 					           saveDir;
@@ -1218,7 +1203,7 @@ int BuildPoly3(
 
 				if (saveListPos < 0)
 				{
-					fprintf(stderr, "* BuildPoly3: cannot find next line: %ld in polygon in list\n", temp.id);
+					fprintf(stdout, "* BuildPoly3: cannot find next line: %ld in polygon in list\n", temp.id);
 					assert(saveListPos >= 0);
 				}
 				assert(found && saveListPos != -1);
@@ -1235,14 +1220,7 @@ int BuildPoly3(
 					assert(endPt == ePt);
 				else
 					assert(startPt == ePt);
-/*
-				saveListPos = FindIdInList(userId, lineIds, idCount);
-				if (saveListPos < 0)
-				{
-					fprintf(stderr, "* BuildPoly3: cannot find line %d in list!\n", userId);
-					assert(saveListPos >= 0);
-				}
-*/
+
 				lid = lineIds[saveListPos];
 				if (lid.dir < 0)
 					lid.dir = 0;
@@ -1251,12 +1229,11 @@ int BuildPoly3(
 					ePt = endPt;
 				else
 					ePt = startPt;
-				//signed char zLevel;
+
 				err = edge->getNode(nh, lid.dir > 0 ? lid.dir : 0, &zLevel);
 				assert(err == 0);
 				lastId = edge->dbAddress();
 				mbr.Envelope(edge->getMBR());
-				//GeoPoint::Envelope( &min, &max, currLine->min, currLine->max );
 
 				if (lid.dir <= 0)
 				{
@@ -1269,18 +1246,10 @@ int BuildPoly3(
 				nextEdge.Unlock();
 
 				polyIds.SetAtGrow(lineCount++, lid);
-				//			if( startId < 0 )
-				//			  startId = -startId;
 				lid.id = 0;
 				lineIds.SetAt(saveListPos, lid);
 				--nLines;
 			}
-#ifdef DO_LATER
-			if (allWater)
-			{
-				nWater++;
-			}
-#endif
 			//
 			//	Calculate final area & centroid
 			//
@@ -1298,43 +1267,7 @@ int BuildPoly3(
 			//	Positive area - right side is inside the polygon
 			//	Negative area - left side is inside the polygon
 			//
-#ifdef SAVE_FOR_NOW
-			if (rval > 0.0)
-			{
-				rval *= 0.5;
-				if (polyId > 0 && nPolys == 0)
-				{
-#if defined( _DEBUG )
-					fprintf(stderr, "Poly: %ld, # lines: %d\n", polyId, lineCount);
-#endif
-					/*
-										WritePolyLine(pLineFile, polyId, &polyIds[0], lineCount);
-										WritePolygon( polyFile, polyName, polyId, mbr, rval, stateCode, polyDfcc, centroid );
-					*/
-				}
-				else
-				{
-					if (polyId > 0)
-					{
-#if defined( _DEBUG )
-						fprintf(stderr, "Poly: %ld was created from %ld\n", *newId, polyId);
-#endif
-					}
-#if defined( _DEBUG )
-					fprintf(stderr, "Poly: %ld, # lines: %d\n", *newId, lineCount);
-#endif
-					/*
-										WritePolyLine( pLineFile, *newId, &polyIds[ 0 ], lineCount );
-										WritePolygon( polyFile, polyName, *newId, mbr, rval, stateCode, polyDfcc,
-												centroid );
-					*/
-					--(*newId);
-				}
 
-				nPolys++;
-			}
-			else
-#endif
 			//if (rval > 0.0)
 			{
 
@@ -1381,19 +1314,15 @@ int BuildPoly3(
 						nPolys = -1;
 						break;
 					}
-					//std::map<int, int>::iterator it = tlidMap.find(tlid);
+
 					if (lineId.dir > 0)
 						dir = 0/*1*/;
 					else
 						dir = 1/*0*/;
 		
-					/*if ((err = tDB.Read(it->second, eh)) != 0)
-					{
-						fprintf(stderr, "**BuildPoly2: failed to find Edge: %ld\n", it->second);
-					}*/
 					if ((err = poly->addEdge(eh, dir)) != 0)
 					{
-						fprintf(stderr, "**BuildPoly3: failed to add Edge: %ld to Poly: %ld\n", tlid, poly->dbAddress());
+						fprintf(stdout, "**BuildPoly3: failed to add Edge: %ld to Poly: %ld\n", tlid, poly->dbAddress());
 					}
 				}
 				po.Unlock();
@@ -1401,29 +1330,24 @@ int BuildPoly3(
 				err = tDB.TrBegin();
 				if ((err = tDB.TrEnd()) != 0)
 				{
-					fprintf(stderr, "**BuildPoly3: TrEnd() failed: %ld\n", err);
+					fprintf(stdout, "**BuildPoly3: TrEnd() failed: %ld\n", err);
 				}
 				if (islandName)
 				{
 					rval *= 0.5;
 #if defined( _DEBUG )
-					fprintf(stderr, "Isle: %ld, # lines: %d\n", *newId, lineCount);
+					fprintf(stdout, "Isle: %ld, # lines: %d\n", *newId, lineCount);
 #endif
-					/*
-										WritePolyLine( pLineFile, *newId, &polyIds[ 0 ], lineCount, FALSE );
-										WritePolygon( polyFile, islandName, *newId, mbr, -rval, stateCode, isleDfcc, centroid );
-					*/
 					--(*newId);
 				}
 			}
 		}
 
-		fprintf(stderr, "Islands: %d, Water: %d\n", nIslands, nWater);
+		fprintf(stdout, "Islands: %d, Water: %d\n", nIslands, nWater);
 	}
 	catch (CDBException* e)
 	{
-		//	THROW_LAST();
-		fprintf(stderr, "BuildPoly3: DBerr: %s\n", e->m_strError);
+		fprintf(stdout, "BuildPoly3: DBerr: %s\n", e->m_strError);
 		nPolys = -1;
 	}
 	catch (CMemoryException* e)

@@ -51,14 +51,11 @@ int BuildPoly2(
 
 int BuildPoly3(
   TigerDB& tDB,
-  //std::map<int, int>& tlidMap,
   const char* polyName,
   unsigned polyDfcc,
   long polyId,
   CArray<GeoDB::DirLineId, GeoDB::DirLineId&>&,
   int nLines,
-  //LineTable&,
-  //NodeTable&,
   int stateCode,
   const char* name,
   long* newId,
