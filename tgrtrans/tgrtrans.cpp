@@ -1,7 +1,19 @@
+//
+//	TgrTrans.cpp - is a program that converts Tiger/Line files to a GeoDB.  The Tiger/Line files ended in 2006
+//	and the Census Bureau started using ESRI shapefiles as the data exchange format.
+//  Copyright(C) 2024 Michael E. Cressey
+//
+//	This program is free software : you can redistribute it and /or modify it under the terms of the
+//	GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or
+//	any later version.
+//
+//	This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+//	implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+//
+//	You should have received a copy of the GNU General Public License along with this program.
+//  If not, see https://www.gnu.org/licenses/
+//
 /*
-* TgrTrans is a program that converts Tiger/Line files to a GeoDB.  The Tiger/Line files ended in 2006 and the Census
-* Bureau started using ESRI shapefiles as the data exchange format.
-* 
 * The 1st program argument is the Tiger/Line file name
 * The 2nd argument is the translation flag:
 * 	'C' | 'c' - creates a GeoDB.  It is followed by 4 floating point numbers indicating the MBR of the database
@@ -150,9 +162,7 @@ int main( int argc, char *argv[] )
   CString rt1Name,
   				baseName,
   			  fName;
-  int /*dirIdx,
-      dotIdx,*/
-      length;
+  int length;
   XY_t sNode,
 		   eNode;
   FILE *csvLines = 0,
@@ -185,85 +195,87 @@ int main( int argc, char *argv[] )
 	double tlFilter = 0.0001;
 	bool doTrendLine = false;
 
-	if( argc <= 1 )
+	if( argc <= 2 )
 	{
-		fputs( "Enter tiger name: ", stdout );
-		fgets( buffer, sizeof( buffer ) - 1, stdin );
+		goto USAGE_ERROR;
+	}
+
+	strcpy(buffer, argv[1]);
+	if( argc > 2 && ( argv[2][0] == '/' || argv[2][0] == '-' ))
+	{
+		doHistory = doGTpoly = doLines = doNames = doBlocks = doPolys = doAddress = doCreate = doTopo = doGNIS = false;
+		int i = 1;
+		while( argv[2][i] != '\0' )		// Can chain options
+		{
+	    switch( argv[2][i] )
+			{
+			default :
+			  printf( "* TgrTrans - invalid argument\n" );
+				goto USAGE_ERROR;
+
+			case 'A':
+			case 'a':
+				doAddress = true;
+				break;
+
+			case 'B':
+			case 'b':
+				doBlocks = true;
+				break;
+
+			case 'C':
+			case 'c':
+				if (argc < 8)
+					goto USAGE_ERROR;
+				doCreate = true;
+				break;
+
+			case 'G':
+			case 'g':
+				doGNIS = true;
+				break;
+
+			case 'H' :
+			case 'h' :
+			  doHistory = true;
+				break;
+
+			case 'I' :
+			case 'i' :
+			  doGTpoly = true;
+				break;
+
+			case 'L' :
+			case 'l' :
+			  doLines = true;
+				break;
+
+			case 'N' :
+			case 'n' :
+			  doNames = true;
+				break;
+
+			case 'p' :
+			case 'P' :
+			  doPolys = true;
+				break;
+
+			case 'T':
+			case 't':
+				doTopo = true;
+				break;
+
+			case 'Z' :
+			case 'z' :
+			  doZips = true;
+				break;
+			}
+			i++;
+		}
 	}
 	else
 	{
-		strcpy(buffer, argv[1]);
-
-		if( argc > 2 && ( argv[ 2 ][ 0 ] == '/' || argv[ 2 ][ 0 ] == '-' ) )
-		{
-			doHistory = doGTpoly = doLines = doNames = doBlocks = doPolys = doAddress = doCreate = doTopo = doGNIS = false;
-			int i = 1;
-			while( argv[2][i] != '\0' )
-			{
-	      switch( argv[2][i] )
-			  {
-			  default :
-			    printf( "* TgrTrans - invalid argument\n" );
-				goto USAGE_ERROR;
-
-				case 'C':
-				case 'c':
-					doCreate = true;
-					break;
-
-				case 'I' :
-			  case 'i' :
-			    doGTpoly = true;
-					break;
-
-			  case 'H' :
-			  case 'h' :
-			    doHistory = true;
-					break;
-
-			  case 'p' :
-			  case 'P' :
-			    doPolys = true;
-					break;
-
-			  case 'L' :
-			  case 'l' :
-			    doLines = true;
-					break;
-
-			  case 'B' :
-			  case 'b' :
-			    doBlocks = true;
-					break;
-
-			  case 'A' :
-			  case 'a' :
-			    doAddress = true;
-					break;
-
-			  case 'N' :
-			  case 'n' :
-			    doNames = true;
-					break;
-
-				case 'G':
-				case 'g':
-					doGNIS = true;
-					break;
-
-				case 'T':
-				case 't':
-					doTopo = true;
-					break;
-
-			  case 'Z' :
-			  case 'z' :
-			    doZips = true;
-					break;
-			  }
-			  i++;
-			}
-		}
+		goto USAGE_ERROR;
 	}
 
 	try
@@ -278,7 +290,6 @@ int main( int argc, char *argv[] )
 
 		TgrNames tgrNames(&db);
 		NameLook nLook(&db);
-//		DistNames distName( &db );
 
 	  length = ::strlen(buffer);
 	  ::fputs(buffer, stdout);
@@ -295,39 +306,29 @@ int main( int argc, char *argv[] )
 				ymax,	//520,
 				ymin;
 
-			/*printf("\nDatabase name? ");
-			if (gets(input) == NULL)
-				return 0;*/
-
 			char name[80];
 			strcpy(name, argv[3]);
 			strcat(name, ".gdb");
-			/* Waldo  Range - Xmin: -69.854694, Ymin: 44.202643, XMax: -68.792301, YMax: 44.754642
-			printf("\nX Min? ");
-			std::getline(std::cin, input);
-			//input << std::cin;*/
+			/* Waldo  Range - Xmin: -69.854694, Ymin: 44.202643, XMax: -68.792301, YMax: 44.754642 */
 			sscanf(argv[4], "%lf", &xmin);
+			printf("\nX Min = % f\n", xmin);
 
-			printf("X Min = %f\n", xmin);
-
-			/*printf("\nY Min? ");
-			std::getline(std::cin, input);*/
 			sscanf(argv[5], "%lf", &ymin);
 			printf("Y Min = %f\n", ymin);
 
-			/*printf("\nX Max? ");
-			std::getline(std::cin, input);*/
 			sscanf(argv[6], "%lf", &xmax);
 			printf("X Max = %f\n", xmax);
 
-			/*printf("\nY Max? ");
-			std::getline(std::cin, input);*/
 			sscanf(argv[7], "%lf", &ymax);
 			printf("Y Max = %f\n", ymax);
+
 			TString tName(argv[3]);
-			error = tDB.dacCreate(tName, 1 << 16);
-			if ((error = tDB.Create(tName, xmin, ymin, xmax, ymax)) != 0)
+			if ((error = tDB.dacCreate(tName, 1 << 16)) != 0 ||
+				(error = tDB.Create(tName, xmin, ymin, xmax, ymax)) != 0)
+			{
+				printf("** Error creating DAC or GDB file: %d\n", error);
 				return -1;
+			}
 
 			printf("Database %s created\n", name);
 
@@ -427,7 +428,8 @@ int main( int argc, char *argv[] )
 	  if( doBlocks )
 	  {
 	    fName = baseName + "b.tab";
-	    tabBlocks = ::fopen( TString(fName), "w" );
+	    if ((tabBlocks = ::fopen( TString(fName), "w" )) == 0)
+				printf("** Cannot create block file %s\n", (const char*)fName);
 /*  Don't open this file
 	    fName = baseName + "b2.csv";
 	    tabBlocks2 = ::fopen( TString(fName), "w" );
@@ -437,7 +439,8 @@ int main( int argc, char *argv[] )
 	  if( doAddress )
 	  {
 			fName = baseName + "a.csv";
-			csvAddr = ::fopen( TString(fName), "w" );
+			if ((csvAddr = ::fopen( TString(fName), "w" )) == 0)
+				printf("** Cannot create address file %s\n", (const char*)fName);
 	  }
 
 	  if( doNames )
@@ -1362,7 +1365,7 @@ NEXT_LINE :
 #endif
 						if ((err = tDB.NewDbObject(DB_POLY, po)) != 0)
 						{
-							fprintf(stderr, "**dbOM.NewDbObject failed\n");
+							fprintf(stdout, "**dbOM.NewDbObject failed\n");
 						}
 						nLandmarkPolys++;
 						poly = (TigerDB::Polygon*)po.Lock();
@@ -1374,7 +1377,10 @@ NEXT_LINE :
 							poly->SetName(name);
 						else
 							poly->SetName("Island");
-
+						XY_t centroid;
+						centroid.x = ps.xcg;
+						centroid.y = ps.ycg;
+						poly->setCentroid(centroid);
 						//poly->write();
 						//po.Unlock();
 						err = tDB.addToSpatialTree(po);
@@ -1397,6 +1403,7 @@ NEXT_LINE :
 						err = poly->addEdge(eh, lineId.dir);
 						assert(err == 0);
 					}
+					fprintf(stdout, " Polygon %ld (%ld) created\n", poly->dbAddress(), poly->userCode);
 					po.Unlock();
 					buildPoly = true;
 					//break;  // Islands don't work now
@@ -1517,11 +1524,12 @@ NEXT_LINE :
 		{
 			FILE *gnisFile = 0,
 				   *nameFile = 0;
+			bool doAll = false;
 
 			if (argc < 5)
 			{
 				printf("Invalid number of arguments %d\n", argc);
-				goto ERR_RETURN;
+				goto USAGE_ERROR;
 			}
 
 			int argLen = ::strlen(argv[4]);
@@ -1532,16 +1540,21 @@ NEXT_LINE :
 			}
 
 			std::vector<std::string> countyList;
-			int nCountyFips = argLen / 3;
-			int startPos = 0;
-			for (int i = 0; i < nCountyFips; i++)
+			if (argLen == 3 && (::strcmp(argv[4], "ALL") == 0 || ::strcmp(argv[4], "all") == 0))
+				doAll = true;
+			else
 			{
-				char saveChar = argv[4][startPos + 3];
-				argv[4][startPos + 3] = '\0';
-				std::string fips(&argv[4][startPos]);
-				countyList.push_back(fips);
-				argv[4][startPos + 3] = saveChar;
-				startPos += 3;
+				int nCountyFips = argLen / 3;
+				int startPos = 0;
+				for (int i = 0; i < nCountyFips; i++)
+				{
+					char saveChar = argv[4][startPos + 3];
+					argv[4][startPos + 3] = '\0';
+					std::string fips(&argv[4][startPos]);
+					countyList.push_back(fips);
+					argv[4][startPos + 3] = saveChar;
+					startPos += 3;
+				}
 			}
 
 			std::string version;
@@ -1551,8 +1564,6 @@ NEXT_LINE :
 				printf("Cannot open GDB %s\n", argv[3]);
 				goto ERR_RETURN;
 			}
-
-			std::string county = "Waldo"/*argv[4]*/;  // Maybe support "ALL"
 			//
 			//	Open GNIS point file
 			//
@@ -1565,8 +1576,6 @@ NEXT_LINE :
 
 			char fName[128];
 			sprintf(fName, "GNISDomesticNames-%s.tab", argv[4]);
-			//std::string fName = "GNIS" + argv[4] + ".tab";
-			//fName.
 			if ((nameFile = ::fopen(fName, "w")) == 0)
 			{
 				tDB.Close();
@@ -1584,9 +1593,8 @@ NEXT_LINE :
 			{
 				std::vector<std::string> split;
 				splitString(record, '|', split);
-				if (std::find(countyList.begin(), countyList.end(), split[6]) == countyList.end())
-				//if (county != split[5])
-					continue;
+				if (!doAll && std::find(countyList.begin(), countyList.end(), split[6]) == countyList.end())
+					continue;			// Skip counties not in list
 				count++;
 				fprintf(nameFile, "%s\t%s\t%s\t%s\n", split[0].c_str(), split[4].c_str(), split[6].c_str(), split[1].c_str());
 				int size = split.size();
@@ -1594,7 +1602,6 @@ NEXT_LINE :
 				double lat = atof(split[12].c_str());
 				double lon = atof(split[13].c_str());
 				TigerDB::GNISFeatures fc = MapFeatureClassToCode(split[2]);
-				//printf(record);
 //#if defined(TEMP)
 				ObjHandle po;
 				if ((error = tDB.NewDbObject(DB_POINT, po)) != 0)
@@ -1717,10 +1724,23 @@ CLEAN_UP :
 	catch( ... )
 	{
 		printf( " *Unknown exception\n" );
-	} 
+	}
+	return -1;
 
 USAGE_ERROR :
-  printf( "TgrTrans <*.*1> [/LIHPBANZ[0|1|2]]\n" );
+	printf("Usage: TgrTrans...\n");
+	printf("  <TGR*.RT1> /a <.gdb filename> : Reads addresses from the .RT1 and .RT6 files and creates an <TGR*a.csv> address file to load into an RDMS\n");
+	printf("  <TGR*.RT1> /b <.gdb filename> : Creates a <TGR*b.tab> block file to be loaded into RDMS\n");
+	printf("  <TGR*.RT1> /c <.gdb filename> <xmin> <ymin> <xmax> <ymax> : Creates a new GDB file\n");
+	printf("  <DomesticNames_*.txt> /g <dbname> <ALL|CountyFipsList> : Creates TigerDB::GNISFeature (point) features and a <GNISDomesticNames-*.tab> file to load into an RDMS\n");
+	printf("  <TGR*.RT1> /h <.gdb filename> : Not supported currently\n");
+	printf("  <TGR*.RT1> /i <.gdb filename> : Creates Tiger Landmark polygons from the <TGR*.RT7>, <TGR*.RT8>, <TGR*.RTI>, <TGR*.RTP> files\n");
+	printf("  <TGR*.RT1> /l <.gdb filename> : Creates Tiger lines from the <TGR*.RT1> file.\n");
+	printf("  <TGR*.RT1> /n <.gdb filename> : Creates a <TGR*n.tab> file which is loaded into an RDMS and processed.  It also connects distinct line names from an RDMS when creating edges\n");
+	printf("  <TGR*.RT1> /p <.gdb filename> : Creates a <TGR*p.csv> file. Has been replaced for a new program called PolyMake\n");
+	printf("  <TGR*.RT1> /t <.gdb filename> : Builds topology (Nodes and directed edges) in the entire .gdb file\n");
+	printf("  <TGR*.RT1> /z <.gdb filename> : Builds zip files.  Not currently implemented\n");
+
 
 ERR_RETURN :
   return( -1 );
