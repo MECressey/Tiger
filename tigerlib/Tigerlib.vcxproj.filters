@@ -88,5 +88,8 @@
     <ClInclude Include="tigerrtP.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="SCAN.HPP">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

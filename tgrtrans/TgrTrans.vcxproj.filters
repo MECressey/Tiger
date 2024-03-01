@@ -30,9 +30,6 @@
     <ClCompile Include="namelook.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="SCAN.CPP">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="tgrnames.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

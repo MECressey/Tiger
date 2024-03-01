@@ -1,3 +1,17 @@
+//
+//	dogtpoly.cpp - are the methods that writes Tiger GT Polygon/Landmark data to several text files.
+//  Copyright(C) 2024 Michael E. Cressey
+//
+//	This program is free software : you can redistribute it and /or modify it under the terms of the
+//	GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or
+//	any later version.
+//
+//	This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+//	implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+//
+//	You should have received a copy of the GNU General Public License along with this program.
+//  If not, see https://www.gnu.org/licenses/
+//
 #include <stdio.h>
 #include <string.h>
 
@@ -30,11 +44,6 @@ void DoGTpoly( FILE *file, const TigerRecI &rec )
   }
   buffer[ count++ ] = ',';
 
-  /*if (rec.cenidr != -1)
-  {
-    i = sprintf( &buffer[ count ], "%d", rec.cenidr );
-    count += i;
-  }*/
   memcpy(&buffer[count], rec.cenidr, sizeof(rec.cenidr));
   count += sizeof(rec.cenidr);
   buffer[ count++ ] = ',';
@@ -49,6 +58,7 @@ void DoGTpoly( FILE *file, const TigerRecI &rec )
   buffer[ count ] = '\0';
   fputs( buffer, file );
 }
+
 
 void DoLMlink( FILE *file, const TigerRec8 &rec )
 {
@@ -65,8 +75,6 @@ void DoLMlink( FILE *file, const TigerRec8 &rec )
   i = sprintf( &buffer[ count ], "%ld,", rec.land );
   count += i;
   
-  /*i = sprintf(&buffer[count], "%d,", rec.cenid);
-  count += i;*/
   memcpy(&buffer[count], rec.cenid, sizeof(rec.cenid));
   count += sizeof(rec.cenid);
   buffer[count++] = ',';
@@ -151,7 +159,7 @@ void DoLMpoint( FILE *file, const TigerRec7 &rec )
   buffer[ count++ ] = rec.source;
   buffer[ count++ ] = ',';
 
-  i = sprintf( &buffer[ count ], "%ld,", pt.y );
+  i = sprintf( &buffer[ count ], "%ld,", pt.y );    // This method won't work for XY_t
   count += i;
 
   i = sprintf( &buffer[ count ], "%ld", pt.x );

@@ -239,6 +239,7 @@
     <ClCompile Include="tigerRtZ.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="SCAN.HPP" />
     <ClInclude Include="tigerlib.h" />
     <ClInclude Include="tigerrt1.h" />
     <ClInclude Include="tigerrt2.h" />

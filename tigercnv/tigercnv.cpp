@@ -1,3 +1,17 @@
+//
+//	tigercnv.cpp - is a program that converts the .RF5 file to a *t.tab names file for loading into an RDBMS
+//  Copyright(C) 2024 Michael E. Cressey
+//
+//	This program is free software : you can redistribute it and /or modify it under the terms of the
+//	GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or
+//	any later version.
+//
+//	This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+//	implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+//
+//	You should have received a copy of the GNU General Public License along with this program.
+//  If not, see https://www.gnu.org/licenses/
+//
 #include <afx.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,10 +41,7 @@ int main( int argc, char *argv[] )
 		printf( "Cannot open input %s\n", (const char *)fName );
 		return( 0 );
 	}
-/*
-  int beg = baseName.Find( "tgr" );
-	baseName = baseName.Right(baseName.GetLength() - beg);
-*/
+
 	baseName += "t.tab";
   if( ( output = ::fopen( baseName, "w" ) ) == 0 )
 	{
@@ -42,7 +53,6 @@ int main( int argc, char *argv[] )
 	{
 		nProcessed++;
 		fprintf( output, "%d\t%d\t%ld\t%s\t%s\t%s\t%s\n", rec.state, rec.county,
-//		fprintf( output, "%d\t%d\t%ld\t%s\t%s\t%s\t%s\t\n", rec.state, rec.county,  Needed extra tab for Access
 			rec.feat, rec.fn.fedirp, rec.fn.fename, rec.fn.fetype, rec.fn.fedirs );
 	}
 

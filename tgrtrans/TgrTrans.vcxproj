@@ -129,7 +129,7 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalIncludeDirectories>\Work\Inc2;..\tigerlib;\work\tigerdb\tgrtypes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>\Work\Inc2;..\tigerlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_WINDOWS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AssemblerListingLocation>.\WinDebug\</AssemblerListingLocation>
       <PrecompiledHeaderOutputFile>.\WinDebug\TgrTrans.pch</PrecompiledHeaderOutputFile>
@@ -226,7 +226,6 @@
     <ClCompile Include="donames.cpp" />
     <ClCompile Include="gnis.cpp" />
     <ClCompile Include="namelook.cpp" />
-    <ClCompile Include="SCAN.CPP" />
     <ClCompile Include="tgrnames.cpp" />
     <ClCompile Include="tgrtrans.cpp" />
   </ItemGroup>
