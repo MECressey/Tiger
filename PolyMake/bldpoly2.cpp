@@ -1,3 +1,18 @@
+//
+//	bldpoly2.cpp - implementation for building hydro polygons using Tiger/Line blocks.  The Tiger/Line files ended in 2006
+//	and the Census Bureau started using ESRI shapefiles as the data exchange format.
+//  Copyright(C) 2024 Michael E. Cressey
+//
+//	This program is free software : you can redistribute it and /or modify it under the terms of the
+//	GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or
+//	any later version.
+//
+//	This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+//	implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+//
+//	You should have received a copy of the GNU General Public License along with this program.
+//  If not, see https://www.gnu.org/licenses/
+//
 #include <afx.h>
 #include <afxdb.h>
 
@@ -7,12 +22,13 @@
 #include <stdio.h>
 #include <string.h>
 
-//#include "bldpoly.h"
 #include "bldpoly2.h"
 #include "GEOTOOLS.HPP"
 //#include "polyline.h"
 #include "geopoint.hpp"
 #include "RANGE.HPP"
+#include "GEODB.HPP"
+#include "TopoTools.h"
 //#include "csvpoly.h"
 
 #include "TString.h"
@@ -24,317 +40,16 @@ using namespace NodeEdgePoly;
 
 static CArray<GeoDB::DirLineId, GeoDB::DirLineId &> polyIds;
 
-inline void DoCalc(
-  const XY_t &pt,
-  const double &xcom, const double &ycom,
-  double &xold, double &yold,
-  double *xcg, double *ycg, double &area
-)
-{
-  double x = (double)pt.x,
-	     y = (double)pt.y,
-	     aretri = (xcom - x) * (yold - ycom) + (xold - xcom) * (y - ycom);
-
-  *xcg += aretri * (x + xold);
-  *ycg += aretri * (y + yold);
-  area += aretri;
-  xold = x;
-  yold = y;
-}
-
-static double CalcArea( GeoLine *line/*GEOPOINT pts[], int nPts*/,
-	const double &xcom, const double &ycom, double *xcg, double *ycg, int dir )
-{
-  double area = 0.0;
-
-  if( dir > 0 )
-  {
-		double xold = (double)line->sNode->pt/*pts[ 0 ]*/.x,
-			   yold = (double)line->sNode->pt/*pts[ 0 ]*/.y;
-
-		if( line->nPts > 2 )
-		{
-		  for( int i = 1; i < line->nPts; i++ )
-		  {
-				double x = (double)line->pts[ i ].x,
-				       y = (double)line->pts[ i ].y,
-				       aretri = (xcom - x) * (yold - ycom) + (xold - xcom) * (y - ycom);
-
-		    *xcg += aretri * (x + xold);
-		    *ycg += aretri * (y + yold);
-		    area += aretri;
-		    xold = x;
-		    yold = y;
-		  }
-		}
-		else
-	      DoCalc( line->eNode->pt, xcom, ycom, xold, yold, xcg, ycg, area );
-  }
-  else
-  {
-//	--nPts;
-		double xold = (double)line->eNode->pt/*pts[ nPts ]*/.x,
-			   yold = (double)line->eNode->pt/*pts[ nPts ]*/.y;
-
-		if( line->nPts > 2 )
-		{
-		  for( int i = line->nPts - 1; --i >= 0; )
-		  {
-				double x = (double)line->pts[ i ].x,
-					   y = (double)line->pts[ i ].y,
-				       aretri = (xcom - x) * (yold - ycom) + (xold - xcom) * (y - ycom);
-
-				*xcg += aretri * (x + xold);
-				*ycg += aretri * (y + yold);
-				area += aretri;
-				xold = x;
-				yold = y;
-		  }
-		}
-		else
-	      DoCalc( line->sNode->pt, xcom, ycom, xold, yold, xcg, ycg, area );
-  }
-
-  return( area );
-}
-
 static int maxPts = 0;
 static XY_t *points = 0;
 
-static double CalcArea(GeoDB::Edge *line,
-	const double& xcom, const double& ycom, double* xcg, double* ycg, int dir)
-{
-	double area = 0.0;
-	XY_t sNode,
-		eNode;
-	int nPts = line->getNumPts();
+static double CalcArea(GeoLine* line, const double& xcom, const double& ycom, double* xcg, double* ycg, int dir);
+static double CalcArea(GeoDB::Edge* line, const double& xcom, const double& ycom, double* xcg, double* ycg, int dir);
+static void WritePolygon(FILE* file, const char* polyName, long polyId, const Range2D& mbr, double area, int state,
+	unsigned polyType, const XY_t& centroid, int loi = 48);
+static void WritePolyLine(FILE* file, long polyId, GeoDB::DirLineId polyIds[], int nIds, BOOL forward = TRUE);
 
-	line->getNodes(&sNode, &eNode);
-
-	if (nPts > 2)
-	{
-		if (nPts > maxPts)
-		{
-			if (points != 0)
-				delete[] points;
-			maxPts = nPts;
-			points = new XY_t[maxPts];
-		}
-		line->Get(points);
-	}
-
-	if (dir > 0)
-	{
-		double xold = sNode.x,
-					 yold = sNode.y;
-
-		if (nPts > 2)
-		{
-			for (int i = 1; i < nPts; i++)
-			{
-				double x = points[i].x,
-							 y = points[i].y,
-							 aretri = (xcom - x) * (yold - ycom) + (xold - xcom) * (y - ycom);
-
-				*xcg += aretri * (x + xold);
-				*ycg += aretri * (y + yold);
-				area += aretri;
-				xold = x;
-				yold = y;
-			}
-		}
-		else
-			DoCalc(eNode, xcom, ycom, xold, yold, xcg, ycg, area);
-	}
-	else
-	{
-		//	--nPts;
-		double xold = eNode.x,
-					 yold = eNode.y;
-
-		if (nPts > 2)
-		{
-			for (int i = nPts - 1; --i >= 0; )
-			{
-				double x = points[i].x,
-							 y = points[i].y,
-							 aretri = (xcom - x) * (yold - ycom) + (xold - xcom) * (y - ycom);
-
-				*xcg += aretri * (x + xold);
-				*ycg += aretri * (y + yold);
-				area += aretri;
-				xold = x;
-				yold = y;
-			}
-		}
-		else
-			DoCalc(sNode, xcom, ycom, xold, yold, xcg, ycg, area);
-	}
-
-	return(area);
-}
-
-void WritePolygon(
-	FILE* file,
-	const char* polyName,
-	long polyId,
-	const Range2D& mbr,
-	double area,
-	int state,
-	unsigned polyType,
-	const XY_t& centroid,
-	int loi = 48
-)
-{
-	char buffer[256];
-	int count, ii;
-	GeoPoint dPt;
-
-	count = sprintf(buffer, "%s\t", polyName);
-	/*  buffer[ count++ ] = '1';
-		buffer[ count++ ] = ',';
-	*/
-	ii = sprintf(&buffer[count], "%ld\t", polyId);
-	count += ii;
-
-/*	if (GetCoordinateSystem() == 0)
-	{
-		ii = sprintf(&buffer[count], "%ld\t", (min.lat - 1) >> 1);
-		count += ii;
-		ii = sprintf(&buffer[count], "%ld\t", (min.lon - 1) >> 1);
-		count += ii;
-		ii = sprintf(&buffer[count], "%ld\t", (max.lat + 1) >> 1);
-		count += ii;
-		ii = sprintf(&buffer[count], "%ld\t", (max.lon + 1) >> 1);
-		count += ii;
-	}
-	else*/
-	{
-		//dPt = min;
-
-		ii = sprintf(&buffer[count], "%.4f\t", mbr.y.min);
-		count += ii;
-
-		ii = sprintf(&buffer[count], "%.4f\t", mbr.x.min);
-		count += ii;
-
-		//dPt = max;
-		ii = sprintf(&buffer[count], "%.4f\t", mbr.y.max);
-		count += ii;
-
-		ii = sprintf(&buffer[count], "%.4f\t", mbr.x.max);
-		count += ii;
-	}
-
-	ii = sprintf(&buffer[count], "%d\t", state);
-	count += ii;
-	//  buffer[ count++ ] = '0';
-
-	ii = sprintf(&buffer[count], "%f\t", area);
-	count += ii;
-
-	ii = sprintf(&buffer[count], "%d\t", polyType);
-	count += ii;
-
-	//dPt = centroid;
-
-	ii = sprintf(&buffer[count], "%.4f\t", centroid.y);
-	count += ii;
-
-	ii = sprintf(&buffer[count], "%.4f\t", centroid.x);
-	count += ii;
-
-	ii = sprintf(&buffer[count], "%d", loi);
-	count += ii;
-
-	buffer[count++] = '\n';
-	buffer[count] = '\0';
-	fputs(buffer, file);
-}
-
-const int POLY_INC = 3;
-
-void WritePolyLine(FILE* file, long polyId, GeoDB::DirLineId polyIds[], int nIds, BOOL forward = TRUE)
-{
-	char buffer[256];
-	int pos = sprintf(buffer, "%ld\t", polyId);
-	int rtsq = -32768;
-
-	if (forward)
-	{
-		for (int i = 0; i < nIds; i++)
-		{
-			const GeoDB::DirLineId& lineId = polyIds[i];
-			int count = pos,
-				ii;
-			long tlid = lineId.id;
-			int dir;
-
-			if (lineId.dir > 0)
-			{
-				dir = 1;
-			}
-			else
-			{
-				dir = 0;
-			}
-
-			ii = sprintf(&buffer[count], "%ld\t", tlid);
-			count += ii;
-
-			ii = sprintf(&buffer[count], "%d\t", rtsq);
-			count += ii;
-			rtsq += POLY_INC;
-
-			if (dir > 0)
-				buffer[count++] = '1';
-			else
-				buffer[count++] = '0';
-
-			buffer[count++] = '\n';
-			buffer[count] = '\0';
-			fputs(buffer, file);
-		}
-	}
-	else
-	{
-		for (int i = nIds; --i >= 0; )
-		{
-			const GeoDB::DirLineId& lineId = polyIds[i];
-			int count = pos,
-				ii;
-			long tlid = lineId.id;
-			int dir;
-
-			if (lineId.dir > 0)
-			{
-				dir = 0;
-			}
-			else
-			{
-				dir = 1;
-			}
-
-			ii = sprintf(&buffer[count], "%ld\t", tlid);
-			count += ii;
-
-			ii = sprintf(&buffer[count], "%d\t", rtsq);
-			count += ii;
-			rtsq += POLY_INC;
-
-			if (dir > 0)
-				buffer[count++] = '1';
-			else
-				buffer[count++] = '0';
-
-			buffer[count++] = '\n';
-			buffer[count] = '\0';
-			fputs(buffer, file);
-		}
-	}
-}
-
-const int NA_SIZE = 20;
+//const int NA_SIZE = 20;
 
 int BuildPoly2(
 	TigerDB& tDB,
@@ -1022,7 +737,7 @@ static int FindIdInList(
 	return -1;
 }
 
-int BuildPoly3(
+int BuildPoly(
 	TigerDB& tDB,
 	const char* polyName,
 	unsigned polyDfcc,
@@ -1046,6 +761,9 @@ int BuildPoly3(
 	int idCount = nLines;
 	char state[20];
 	GeoDB::DirLineId lid;
+
+	maxPts = 20000;
+	points = new XY_t[maxPts];
 
 	try
 	{
@@ -1086,7 +804,7 @@ int BuildPoly3(
 					err = tDB.dacSearch(DB_EDGE, &dbHash, oh);
 					if (err != 0)
 					{
-						fprintf(stdout, "* BuildPoly3: cannot find line: %ld\n", startId);
+						fprintf(stdout, "* BuildPoly: cannot find line: %ld\n", startId);
 						nPolys = -1;
 						goto ERR_RETURN;
 					}
@@ -1130,7 +848,7 @@ int BuildPoly3(
 
 			if (i == idCount)
 			{
-				fprintf(stderr, "BuildPoly3: could not find a starting line\n");
+				fprintf(stderr, "BuildPoly: could not find a starting line\n");
 				if (startCode != 0)
 				{
 					break;
@@ -1144,11 +862,11 @@ int BuildPoly3(
 			//
 			//	Calculate area, centroid & MBR (assuming we will close)
 			//
-			double xcg = 0.0,
+			/*double xcg = 0.0,
 							ycg = 0.0,
 							xcom = (double)sPt.x,
 							ycom = (double)sPt.y,
-							rval = 0.0;
+							rval = 0.0;*/
 			//
 			//	Loop till the area closes
 			//
@@ -1203,7 +921,7 @@ int BuildPoly3(
 
 				if (saveListPos < 0)
 				{
-					fprintf(stdout, "* BuildPoly3: cannot find next line: %ld in polygon in list\n", temp.id);
+					fprintf(stdout, "* BuildPoly: cannot find next line: %ld in polygon in list\n", temp.id);
 					assert(saveListPos >= 0);
 				}
 				assert(found && saveListPos != -1);
@@ -1234,7 +952,7 @@ int BuildPoly3(
 				assert(err == 0);
 				lastId = edge->dbAddress();
 				mbr.Envelope(edge->getMBR());
-
+/*
 				if (lid.dir <= 0)
 				{
 					rval += CalcArea(edge, xcom, ycom, & xcg, & ycg, -1);
@@ -1243,6 +961,7 @@ int BuildPoly3(
 				{
 					rval += CalcArea(edge, xcom, ycom, &xcg, &ycg, 1);
 				}
+				*/
 				nextEdge.Unlock();
 
 				polyIds.SetAtGrow(lineCount++, lid);
@@ -1253,7 +972,7 @@ int BuildPoly3(
 			//
 			//	Calculate final area & centroid
 			//
-			double areai = 1.0 / rval;
+			/*double areai = 1.0 / rval;
 			if ((xcg = (xcg * areai + xcom) * (1.0 / 3.0)) <= 0.0)
 				fprintf(stderr, "Centroid X: %lf\n", xcg);
 			if ((ycg = (ycg * areai + ycom) * (1.0 / 3.0)) <= 0.0)
@@ -1263,6 +982,7 @@ int BuildPoly3(
 
 			centroid.y = (ycg + 0.5);
 			centroid.x = (xcg + 0.5);
+			*/
 			//
 			//	Positive area - right side is inside the polygon
 			//	Negative area - left side is inside the polygon
@@ -1276,15 +996,15 @@ int BuildPoly3(
 				int err;
 				if ((err = tDB.NewDbObject(DB_POLY, po)) != 0)
 				{
-					fprintf(stderr, "**BuildPoly3: dbOM.NewDbObject failed\n");
+					fprintf(stderr, "**BuildPoly: dbOM.NewDbObject failed\n");
 				}
 
 				TigerDB::Polygon* poly = (TigerDB::Polygon*)po.Lock();
 
 				poly->userCode = TigerDB::HYDRO_PerennialLakeOrPond;
-				poly->setArea(-rval);
+				//poly->setArea(-rval);
 				poly->setMBR(mbr);
-				if (rval < 0.0)
+				/*if (rval < 0.0)
 				{
 					nPolys++;
 					poly->SetName("LAKE");
@@ -1293,7 +1013,7 @@ int BuildPoly3(
 				{
 					poly->SetName("ISLAND");
 					nIslands++;
-				}
+				}*/
 				//err = poly->write();
 				//po.Unlock();
 				err = tDB.addToSpatialTree(po);
@@ -1310,7 +1030,7 @@ int BuildPoly3(
 					err = tDB.dacSearch(DB_EDGE, &dbHash, eh);
 					if (err != 0)
 					{
-						fprintf(stderr, "* BuildPoly3: cannot find line: %ld\n", startId);
+						fprintf(stderr, "* BuildPoly: cannot find line: %ld\n", startId);
 						nPolys = -1;
 						break;
 					}
@@ -1322,46 +1042,368 @@ int BuildPoly3(
 		
 					if ((err = poly->addEdge(eh, dir)) != 0)
 					{
-						fprintf(stdout, "**BuildPoly3: failed to add Edge: %ld to Poly: %ld\n", tlid, poly->dbAddress());
+						fprintf(stdout, "**BuildPoly: failed to add Edge: %ld to Poly: %ld\n", tlid, poly->dbAddress());
 					}
+				}
+				int nPoints = GeoDB::Poly::getPts(po, points);
+				assert(nPoints <= maxPts);
+				XY_t cen;
+				double area;
+				TopoTools::calcCentroid(points, nPoints, &cen, &area);
+				poly->setArea(area);
+				poly->setCentroid(cen);
+				if (area < 0.0)
+				{
+					poly->SetName("Island");
+					nIslands++;
+				}
+				else
+				{
+					poly->SetName("Hydro");
+					nPolys++;
 				}
 				po.Unlock();
 
 				err = tDB.TrBegin();
 				if ((err = tDB.TrEnd()) != 0)
 				{
-					fprintf(stdout, "**BuildPoly3: TrEnd() failed: %ld\n", err);
+					fprintf(stdout, "**BuildPoly: TrEnd() failed: %ld\n", err);
 				}
-				if (islandName)
+/*				if (islandName)
 				{
 					rval *= 0.5;
 #if defined( _DEBUG )
 					fprintf(stdout, "Isle: %ld, # lines: %d\n", *newId, lineCount);
 #endif
 					--(*newId);
-				}
+				}*/
 			}
 		}
-
 		fprintf(stdout, "Islands: %d, Water: %d\n", nIslands, nWater);
 	}
 	catch (CDBException* e)
 	{
-		fprintf(stdout, "BuildPoly3: DBerr: %s\n", e->m_strError);
+		fprintf(stdout, "BuildPoly: DBerr: %s\n", e->m_strError);
 		nPolys = -1;
 	}
 	catch (CMemoryException* e)
 	{
-		fprintf(stderr, "BuildPoly3: memory exception\n");
+		fprintf(stderr, "BuildPoly: memory exception\n");
 		nPolys = -1;
 	}
 	catch (CException* e)
 	{
-		fprintf(stderr, "BuildPoly3: C exception\n");
+		fprintf(stderr, "BuildPoly: C exception\n");
 		nPolys = -1;
 	}
 
 ERR_RETURN:
+	delete[] points;
 
 	return(nPolys);
+}
+
+inline void DoCalc(
+	const XY_t& pt,
+	const double& xcom, const double& ycom,
+	double& xold, double& yold,
+	double* xcg, double* ycg, double& area
+)
+{
+	double x = (double)pt.x,
+		y = (double)pt.y,
+		aretri = (xcom - x) * (yold - ycom) + (xold - xcom) * (y - ycom);
+
+	*xcg += aretri * (x + xold);
+	*ycg += aretri * (y + yold);
+	area += aretri;
+	xold = x;
+	yold = y;
+}
+
+static double CalcArea(GeoLine* line, const double& xcom, const double& ycom, double* xcg, double* ycg, int dir)
+{
+	double area = 0.0;
+
+	if (dir > 0)
+	{
+		double xold = (double)line->sNode->pt/*pts[ 0 ]*/.x,
+			yold = (double)line->sNode->pt/*pts[ 0 ]*/.y;
+
+		if (line->nPts > 2)
+		{
+			for (int i = 1; i < line->nPts; i++)
+			{
+				double x = (double)line->pts[i].x,
+					y = (double)line->pts[i].y,
+					aretri = (xcom - x) * (yold - ycom) + (xold - xcom) * (y - ycom);
+
+				*xcg += aretri * (x + xold);
+				*ycg += aretri * (y + yold);
+				area += aretri;
+				xold = x;
+				yold = y;
+			}
+		}
+		else
+			DoCalc(line->eNode->pt, xcom, ycom, xold, yold, xcg, ycg, area);
+	}
+	else
+	{
+		//	--nPts;
+		double xold = (double)line->eNode->pt/*pts[ nPts ]*/.x,
+			yold = (double)line->eNode->pt/*pts[ nPts ]*/.y;
+
+		if (line->nPts > 2)
+		{
+			for (int i = line->nPts - 1; --i >= 0; )
+			{
+				double x = (double)line->pts[i].x,
+					y = (double)line->pts[i].y,
+					aretri = (xcom - x) * (yold - ycom) + (xold - xcom) * (y - ycom);
+
+				*xcg += aretri * (x + xold);
+				*ycg += aretri * (y + yold);
+				area += aretri;
+				xold = x;
+				yold = y;
+			}
+		}
+		else
+			DoCalc(line->sNode->pt, xcom, ycom, xold, yold, xcg, ycg, area);
+	}
+
+	return(area);
+}
+
+static double CalcArea(GeoDB::Edge* line, const double& xcom, const double& ycom, double* xcg, double* ycg, int dir)
+{
+	double area = 0.0;
+	XY_t sNode,
+		eNode;
+	int nPts = line->getNumPts();
+
+	line->getNodes(&sNode, &eNode);
+
+	if (nPts > 2)
+	{
+		if (nPts > maxPts)
+		{
+			if (points != 0)
+				delete[] points;
+			maxPts = nPts;
+			points = new XY_t[maxPts];
+		}
+		line->Get(points);
+	}
+
+	if (dir > 0)
+	{
+		double xold = sNode.x,
+			yold = sNode.y;
+
+		if (nPts > 2)
+		{
+			for (int i = 1; i < nPts; i++)
+			{
+				double x = points[i].x,
+					y = points[i].y,
+					aretri = (xcom - x) * (yold - ycom) + (xold - xcom) * (y - ycom);
+
+				*xcg += aretri * (x + xold);
+				*ycg += aretri * (y + yold);
+				area += aretri;
+				xold = x;
+				yold = y;
+			}
+		}
+		else
+			DoCalc(eNode, xcom, ycom, xold, yold, xcg, ycg, area);
+	}
+	else
+	{
+		//	--nPts;
+		double xold = eNode.x,
+			yold = eNode.y;
+
+		if (nPts > 2)
+		{
+			for (int i = nPts - 1; --i >= 0; )
+			{
+				double x = points[i].x,
+					y = points[i].y,
+					aretri = (xcom - x) * (yold - ycom) + (xold - xcom) * (y - ycom);
+
+				*xcg += aretri * (x + xold);
+				*ycg += aretri * (y + yold);
+				area += aretri;
+				xold = x;
+				yold = y;
+			}
+		}
+		else
+			DoCalc(sNode, xcom, ycom, xold, yold, xcg, ycg, area);
+	}
+
+	return(area);
+}
+
+static void WritePolygon(
+	FILE* file,
+	const char* polyName,
+	long polyId,
+	const Range2D& mbr,
+	double area,
+	int state,
+	unsigned polyType,
+	const XY_t& centroid,
+	int loi
+)
+{
+	char buffer[256];
+	int count, ii;
+	GeoPoint dPt;
+
+	count = sprintf(buffer, "%s\t", polyName);
+	/*  buffer[ count++ ] = '1';
+		buffer[ count++ ] = ',';
+	*/
+	ii = sprintf(&buffer[count], "%ld\t", polyId);
+	count += ii;
+
+	/*	if (GetCoordinateSystem() == 0)
+		{
+			ii = sprintf(&buffer[count], "%ld\t", (min.lat - 1) >> 1);
+			count += ii;
+			ii = sprintf(&buffer[count], "%ld\t", (min.lon - 1) >> 1);
+			count += ii;
+			ii = sprintf(&buffer[count], "%ld\t", (max.lat + 1) >> 1);
+			count += ii;
+			ii = sprintf(&buffer[count], "%ld\t", (max.lon + 1) >> 1);
+			count += ii;
+		}
+		else*/
+	{
+		//dPt = min;
+
+		ii = sprintf(&buffer[count], "%.4f\t", mbr.y.min);
+		count += ii;
+
+		ii = sprintf(&buffer[count], "%.4f\t", mbr.x.min);
+		count += ii;
+
+		//dPt = max;
+		ii = sprintf(&buffer[count], "%.4f\t", mbr.y.max);
+		count += ii;
+
+		ii = sprintf(&buffer[count], "%.4f\t", mbr.x.max);
+		count += ii;
+	}
+
+	ii = sprintf(&buffer[count], "%d\t", state);
+	count += ii;
+	//  buffer[ count++ ] = '0';
+
+	ii = sprintf(&buffer[count], "%f\t", area);
+	count += ii;
+
+	ii = sprintf(&buffer[count], "%d\t", polyType);
+	count += ii;
+
+	//dPt = centroid;
+
+	ii = sprintf(&buffer[count], "%.4f\t", centroid.y);
+	count += ii;
+
+	ii = sprintf(&buffer[count], "%.4f\t", centroid.x);
+	count += ii;
+
+	ii = sprintf(&buffer[count], "%d", loi);
+	count += ii;
+
+	buffer[count++] = '\n';
+	buffer[count] = '\0';
+	fputs(buffer, file);
+}
+
+const int POLY_INC = 3;
+
+static void WritePolyLine(FILE* file, long polyId, GeoDB::DirLineId polyIds[], int nIds, BOOL forward)
+{
+	char buffer[256];
+	int pos = sprintf(buffer, "%ld\t", polyId);
+	int rtsq = -32768;
+
+	if (forward)
+	{
+		for (int i = 0; i < nIds; i++)
+		{
+			const GeoDB::DirLineId& lineId = polyIds[i];
+			int count = pos,
+				ii;
+			long tlid = lineId.id;
+			int dir;
+
+			if (lineId.dir > 0)
+			{
+				dir = 1;
+			}
+			else
+			{
+				dir = 0;
+			}
+
+			ii = sprintf(&buffer[count], "%ld\t", tlid);
+			count += ii;
+
+			ii = sprintf(&buffer[count], "%d\t", rtsq);
+			count += ii;
+			rtsq += POLY_INC;
+
+			if (dir > 0)
+				buffer[count++] = '1';
+			else
+				buffer[count++] = '0';
+
+			buffer[count++] = '\n';
+			buffer[count] = '\0';
+			fputs(buffer, file);
+		}
+	}
+	else
+	{
+		for (int i = nIds; --i >= 0; )
+		{
+			const GeoDB::DirLineId& lineId = polyIds[i];
+			int count = pos,
+				ii;
+			long tlid = lineId.id;
+			int dir;
+
+			if (lineId.dir > 0)
+			{
+				dir = 0;
+			}
+			else
+			{
+				dir = 1;
+			}
+
+			ii = sprintf(&buffer[count], "%ld\t", tlid);
+			count += ii;
+
+			ii = sprintf(&buffer[count], "%d\t", rtsq);
+			count += ii;
+			rtsq += POLY_INC;
+
+			if (dir > 0)
+				buffer[count++] = '1';
+			else
+				buffer[count++] = '0';
+
+			buffer[count++] = '\n';
+			buffer[count] = '\0';
+			fputs(buffer, file);
+		}
+	}
 }

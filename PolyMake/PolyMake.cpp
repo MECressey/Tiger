@@ -1,4 +1,17 @@
-// PolyMake.cpp : This file contains the 'main' function. Program execution begins and ends there.
+//
+//	PolyMake.cpp - main program for building hydro polygons using Tiger/Line blocks.  The Tiger/Line files ended in 2006
+//	and the Census Bureau started using ESRI shapefiles as the data exchange format.
+//  Copyright(C) 2024 Michael E. Cressey
+//
+//	This program is free software : you can redistribute it and /or modify it under the terms of the
+//	GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or
+//	any later version.
+//
+//	This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+//	implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+//
+//	You should have received a copy of the GNU General Public License along with this program.
+//  If not, see https://www.gnu.org/licenses/
 //
 
 #include <iostream>
@@ -16,11 +29,8 @@
 #include "NODETABL.HPP"
 #include "polynode.HPP"
 #include "bldpoly2.h"
-//#include "dac.hpp"
 
 using namespace NodeEdgePoly;
-
-//#ifdef SAVE_FOR_NOW
 
 static int BlkFind(const CString& blk)
 {
@@ -40,8 +50,7 @@ static int BlkFind(const CString& blk)
 	return(pos);
 }
 
-int GetWaterLines(CDatabase& db, LPCTSTR blkTable, int county, /*const char* lineTable,
-	const char* equivTable,*/ CArray<GeoDB::DirLineId, GeoDB::DirLineId&>& ids)
+static int GetWaterLines(CDatabase& db, LPCTSTR blkTable, int county, CArray<GeoDB::DirLineId, GeoDB::DirLineId&>& ids)
 {
 	int nLines = 0;
 
@@ -51,7 +60,6 @@ int GetWaterLines(CDatabase& db, LPCTSTR blkTable, int county, /*const char* lin
 //
 //	Get the blocks that have water on either the left or the right
 //
-		//blks.m_strFilter = "blkl like '%99%' OR blkr like '%99%'";
 		blks.m_strFilter.Format(_T("county = %d AND "), county);
 		blks.m_strFilter += _T("(blkl like '%99%' OR blkr like '%99%')");
 		blks.Open(CRecordset::forwardOnly, blkTable, CRecordset::readOnly);
@@ -118,15 +126,14 @@ int GetWaterLines(CDatabase& db, LPCTSTR blkTable, int county, /*const char* lin
 
 	return(nLines);
 }
-//#endif
 
-int FillTopoTables(
-	TigerDB::Chain* line, //const CDbLines& line,
+static int FillTopoTables(
+	TigerDB::Chain* line,
 	LineTable* lTable,
 	NodeTable* nTable
 )
 {
-	long tlid = line->userId/*GetTLID()*/;
+	long tlid = line->userId;
 	PolyNode* node;
 	double angle;
 	GeoLine* newLine;
@@ -143,8 +150,7 @@ int FillTopoTables(
 	ASSERT(newLine != 0);
 
 	newLine->tlid = tlid;
-	newLine->dfcc = line->userCode; // .GetDFCC();
-	//strcpy(newLine->cfcc, line.GetCFCC());
+	newLine->dfcc = line->userCode;
 	lTable->Link(newLine, tlid);
 	line->getNodes(&newLine->sPt, &newLine->ePt);
 	newLine->mbr = line->getMBR();
@@ -171,7 +177,7 @@ int FillTopoTables(
 		nTable->Link(node, hashVal);
 	}
 
-	node->Insert(newLine/*tlid*/, angle);
+	node->Insert(newLine, angle);
 	newLine->sNode = node;
 
 	hashVal = newLine->ePt.Hash();
@@ -187,11 +193,231 @@ int FillTopoTables(
 	else
 		angle = newLine->ePt.Angle(newLine->sPt);
 
-	node->Insert(newLine/*-tlid*/, angle);
+	node->Insert(newLine, angle);
 	newLine->eNode = node;
 
 	return(0);
 }
+
+int AddClosureLines(
+	std::map<int, int>& tlidMap,
+	TigerDB &db, 
+	CArray<GeoDB::DirLineId, GeoDB::DirLineId&>& lineIds,
+	int &nLines
+)
+{
+	int nCLines = 0;
+	for (auto it = tlidMap.begin(); it != tlidMap.end(); it++)
+	{
+		ObjHandle oh;
+		int err = db.Read(it->second, oh);
+		TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
+		assert(it->first == line->userId/*GetTLID()*/);
+		if (line->userCode == TigerDB::HYDRO_USGSClosureLine)
+		{
+			int i;
+			long tlid = it->first;
+
+			for (i = 0; i < nLines; i++)
+			{
+				const GeoDB::DirLineId& lineId = lineIds[i];
+
+				if (lineId.id == tlid /*|| lineIds[ i ] == -tlid*/)
+				{
+					break;
+				}
+			}
+
+			if (i == nLines)
+			{
+				GeoDB::DirLineId lineId;
+
+				lineId.id = tlid;
+				lineId.dir = 1;
+				lineIds.SetAtGrow(nLines, lineId/*tlid*/);
+				nLines++;
+				lineId.dir = -1;
+				lineIds.SetAtGrow(nLines, lineId/*-tlid*/);
+				nLines++;
+				printf("* USGS Closure line: %ld\n", tlid);
+				nCLines++;
+			}
+		}
+		oh.Unlock();
+	}
+	return nCLines;
+}
+
+int main(int argc, char* argv[])
+{
+	bool doHydro = true;
+	try
+	{
+		CDatabase db;
+		db.Open(_T("TigerBase"), FALSE, TRUE, _T("ODBC;"), FALSE);
+		CArray<GeoDB::DirLineId, GeoDB::DirLineId&> lineIds;
+		CString baseName = "";
+		TigerDB tDB(&db);
+
+		if (argc < 3)
+		{
+			printf("* Invalid arguments: %d\n", argc);
+			return -1;
+		}
+
+		int stateFips = ::atoi(argv[2]);
+		switch (stateFips)
+		{
+		case 23:
+			baseName = "ME";
+			break;
+		default:
+			printf("* State %d not supported at this time\n", stateFips);
+			return -1;
+		}
+		std::string version;
+		int err = tDB.Open(TString(argv[1]), version, 1);
+		if (err != 0)
+		{
+			printf("* Cannot open: %s\n", argv[1]);
+			return -1;
+		}
+
+		int countyFips = ::atoi(argv[3]);
+
+		std::map<int, int> tlidMap;
+#if defined(SAVE_FOR_NOW)
+		FILE* file = ::fopen("C:\\Work\\Census\\Data\\Maine-2006\\Waldo\\TGR23027Map.tab", "r");
+		short s;
+		//DAC dac;
+		//err = dac.open(TString("C:\\Work\\Waldo2006.dac"), 0, 1, &s);
+
+		char record[100];
+		while (::fgets(record, sizeof(record) - 1, file) != NULL)
+		{
+			char* pos = strchr(record, '\t');
+			*pos = '\0';
+			int tlid = atoi(record);
+			int recPtr = atoi(++pos);
+
+			ObjHandle oh;
+			DbHash dbHash;
+			dbHash.tlid = tlid;
+			err = tDB.dacSearch(DB_EDGE, &dbHash, oh);
+			assert(err == 0);
+			TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
+			int rec = line->dbAddress();
+			assert(rec == recPtr);
+			tlidMap.insert({ tlid, recPtr });
+			oh.Unlock();
+		}
+#endif
+
+		if (doHydro)
+		{
+			int nLines;
+			long newId = 0;
+			CString blockTable = baseName + "blocks";
+			CString equivTable = baseName + "equiv";
+/*	Tables used to create polygons before topology was built into GeoDB
+			LineTable lTable(1 << 16);
+			NodeTable nTable;
+*/
+			lineIds.SetSize(10000, 1000);
+
+			if ((nLines = GetWaterLines(db, blockTable, countyFips, lineIds)) <= 0)
+			{
+				fprintf(stdout, "Error getting Hydro lines: %s\n", (char *)(LPCTSTR)blockTable);
+				return -1;
+			}
+
+			int nClosureLines = AddClosureLines(tlidMap, tDB, lineIds, nLines);
+			fprintf(stdout, "\nNumber of Closure Lines: %d\n", nClosureLines);
+
+			int count = 0;
+
+#ifdef TEST_HYDRO
+			CDbLines lines(&db, 0);
+			lines.m_strFilter = "(DFCC = 111)";
+			lines.Open(CRecordset::forwardOnly, lineTable, CRecordset::readOnly);
+			while (!lines.IsEOF())
+			{
+				CDbLines::Id tlid = lines.GetTLID();
+				int i;
+
+				for (i = 0; i < nLines; i++)
+				{
+					long id;
+					if ((id = lineIds[i]) == tlid || id == -tlid)
+					{
+						break;
+					}
+				}
+
+				if (i == nLines)
+				{
+					count++;
+					lineIds.Add(tlid);
+				}
+
+				lines.MoveNext();
+			}
+			lines.Close();
+#endif
+			fprintf(stdout, "\nNumber of Lines: %d\n", nLines);
+/*	This is the old way of building polygons before topology was built into GeoDB
+			FillPolyTables(tlidMap, tDB, nLines, lineIds, lTable, nTable);
+			fprintf(stderr, "\nNumber of Nodes: %d\n", nTable.GetNumItems());
+*/
+			//int stateCode = 23;
+			int nPolys = BuildPoly(tDB, "HYDRO", OPEN_WATER, 0, lineIds, nLines + count,
+				 stateFips, TString(baseName), &newId, nLines, "ISLAND", 121);
+			fprintf(stdout, "Number of polygons: %ld\n", nPolys);
+
+			long tSize,
+				nEntries;
+			int maxBucket;
+			float average;
+/*	Old way of building polygons
+			tSize = lTable.GetStats(&nEntries, &maxBucket, &average);
+			fprintf(stderr, "LineTable - Size:%ld, Buckets Used:%ld, Objects:%ld, Max chain:%d, Avg:%lf\n",
+				tSize, nEntries, lTable.GetNumItems(), maxBucket, (double)average);
+
+			tSize = nTable.GetStats(&nEntries, &maxBucket, &average);
+			fprintf(stderr, "NodeTable - Size:%ld, Buckets Used:%ld, Objects:%ld, Max chain:%d, Avg:%lf\n",
+				tSize, nEntries, nTable.GetNumItems(), maxBucket, (double)average);
+
+			lTable.Flush();
+			nTable.Flush();
+*/
+		}
+		tDB.Close();
+		db.Close();
+	}
+	catch (CDBException* e)
+	{
+		fprintf(stderr, "* PolyMake: DB err: %s\n", e->m_strError);
+		fprintf(stderr, "%s\n", e->m_strStateNativeOrigin);
+		e->Delete();
+	}
+	catch (CMemoryException* e)
+	{
+		fprintf(stderr, "* PolyMake: memory exception\n");
+		e->Delete();
+	}
+	catch (CException* e)
+	{
+		fprintf(stderr, "* PolyMake: C exception\n");
+		e->Delete();
+	}
+	catch (...)
+	{
+		fprintf(stderr, "* PolyMake: other exception\n");
+	}
+
+	return(0);
+}
+
 
 static int addNode(
 	TigerDB& db,
@@ -241,8 +467,6 @@ static int addNode(
 	ObjHandle no;
 	if (!found)
 	{
-		//assert(pNode == 0 || !(pNode->pt == nodePt) );
-
 		if ((err = db.NewObject(DB_NODE, no/*, id*/)) != 0)
 		{
 			fprintf(stderr, "**addNode: dbOM.newObject failed\n");
@@ -279,8 +503,8 @@ static int addNode(
 	return err;
 }
 
-int FillTopoTables2(
-	TigerDB &db,
+static int FillTopoTables2(
+	TigerDB& db,
 	GeoDB::Edge* line,
 	LineTable* lTable,
 	NodeTable* nTable
@@ -288,10 +512,10 @@ int FillTopoTables2(
 {
 	long tlid = line->userId;
 	double angle;
-	
+
 	XY_t sPt,
-			 ePt;
-	XY_t *pts = 0;
+		ePt;
+	XY_t* pts = 0;
 	line->getNodes(&sPt, &ePt);
 	int nPts = line->getNumPts();
 
@@ -327,10 +551,9 @@ int FillTopoTables2(
 	return err;
 }
 
-int FillPolyTables(
-	std::map<int, int> &tlidMap,
-	//DAC &dac,
-	TigerDB &db,
+static int FillPolyTables(
+	std::map<int, int>& tlidMap,
+	TigerDB& db,
 	int nLines,
 	CArray<GeoDB::DirLineId, GeoDB::DirLineId&>& lineIds,
 	LineTable& lTable,
@@ -347,12 +570,12 @@ int FillPolyTables(
 			ObjHandle oh;
 			DbHash dbHash;
 			dbHash.tlid = tlid;
-			int err = db.dacSearch(DB_EDGE/*DB_TIGER_LINE*/, &dbHash, oh);
+			int err = db.dacSearch(DB_EDGE, &dbHash, oh);
 
 			if (err != 0)
-			//std::map<int, int>::iterator it = tlidMap.find(tlid);
-			//if (it == tlidMap.end())
-			//if (!lineById.Requery() || lineById.IsEOF())
+				//std::map<int, int>::iterator it = tlidMap.find(tlid);
+				//if (it == tlidMap.end())
+				//if (!lineById.Requery() || lineById.IsEOF())
 			{
 				GeoDB::DirLineId lineId;
 
@@ -369,7 +592,7 @@ int FillPolyTables(
 			GeoDB::Edge* line = (GeoDB::Edge*)oh.Lock();
 			//if ((err = FillTopoTables2(db, line, &lTable, &nTable)) != 0)
 			//	fprintf(stderr, "** FillTopoTables2 failed: %d\n", err);
-			
+
 			//FillTopoTables(line, &lTable, &nTable);
 			oh.Unlock();
 			//
@@ -380,15 +603,15 @@ int FillPolyTables(
 
 		return(0);
 	}
-	catch(CDBException *e)
+	catch (CDBException* e)
 	{
 		fprintf(stderr, "FillPolyTables: DB err: %s\n", e->m_strError);
 	}
-	catch(CMemoryException *e)
+	catch (CMemoryException* e)
 	{
 		fprintf(stderr, "FillPolyTables: memory exception\n");
 	}
-	catch(CException *e)
+	catch (CException* e)
 	{
 		fprintf(stderr, "FillPolyTables: C exception\n");
 	}
@@ -396,9 +619,8 @@ int FillPolyTables(
 	return(-1);
 }
 
-int FillPolyTables2(
+static int FillPolyTables2(
 	std::map<int, int>& tlidMap,
-	//DAC &dac,
 	TigerDB& db,
 	int nLines,
 	CArray<GeoDB::DirLineId, GeoDB::DirLineId&>& lineIds,
@@ -460,271 +682,3 @@ int FillPolyTables2(
 
 	return(-1);
 }
-
-int AddClosureLines(
-	std::map<int, int>& tlidMap,
-	TigerDB &db, 
-	CArray<GeoDB::DirLineId, GeoDB::DirLineId&>& lineIds,
-	int &nLines
-)
-{
-	int nCLines = 0;
-	for (auto it = tlidMap.begin(); it != tlidMap.end(); it++)
-	{
-		ObjHandle oh;
-		int err = db.Read(it->second, oh);
-		TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
-		assert(it->first == line->userId/*GetTLID()*/);
-		if (line->userCode == TigerDB::HYDRO_USGSClosureLine)
-		{
-			int i;
-			long tlid = it->first;
-
-			for (i = 0; i < nLines; i++)
-			{
-				const GeoDB::DirLineId& lineId = lineIds[i];
-
-				if (lineId.id == tlid /*|| lineIds[ i ] == -tlid*/)
-				{
-					break;
-				}
-			}
-
-			if (i == nLines)
-			{
-				GeoDB::DirLineId lineId;
-
-				lineId.id = tlid;
-				lineId.dir = 1;
-				lineIds.SetAtGrow(nLines, lineId/*tlid*/);
-				nLines++;
-				lineId.dir = -1;
-				lineIds.SetAtGrow(nLines, lineId/*-tlid*/);
-				nLines++;
-				printf("* USGS Closure line: %ld\n", tlid);
-				nCLines++;
-			}
-		}
-		oh.Unlock();
-	}
-	return nCLines;
-}
-
-int main(int argc, char* argv[])
-{
-	bool doHydro = true;
-	try
-	{
-		CDatabase db;
-		//db.SetQueryTimeout(60 * 10);
-		db.Open(_T("TigerBase"), FALSE, TRUE, _T("ODBC;"), FALSE);
-		CArray<GeoDB::DirLineId, GeoDB::DirLineId&> lineIds;
-		CString baseName = "";
-		TigerDB tDB(&db);
-
-		if (argc < 3)
-		{
-			printf("* Invalid arguments: %d\n", argc);
-			return -1;
-		}
-
-
-		int stateFips = ::atoi(argv[2]);
-		switch (stateFips)
-		{
-		case 23:
-			baseName = "ME";
-			break;
-		default:
-			printf("* State %d not supported at this time\n", stateFips);
-			return -1;
-		}
-		std::string version;
-		int err = tDB.Open(TString(argv[1]), version, 1);
-		if (err != 0)
-		{
-			printf("* Cannot open: %s\n", argv[1]);
-			return -1;
-		}
-
-		int countyFips = ::atoi(argv[3]);
-
-		std::map<int, int> tlidMap;
-#ifdef SAVE_FOR_NOW
-		FILE* file = ::fopen("C:\\Work\\Census\\Data\\Maine-2006\\Waldo\\TGR23027Map.tab", "r");
-		short s;
-		//DAC dac;
-		//err = dac.open(TString("C:\\Work\\Waldo2006.dac"), 0, 1, &s);
-
-		char record[100];
-		while (::fgets(record, sizeof(record) - 1, file) != NULL)
-		{
-			char* pos = strchr(record, '\t');
-			*pos = '\0';
-			int tlid = atoi(record);
-			int recPtr = atoi(++pos);
-
-			ObjHandle oh;
-			DbHash dbHash;
-			dbHash.tlid = tlid;
-			err = tDB.dacSearch(DB_EDGE, &dbHash, oh);
-			assert(err == 0);
-			TigerDB::Chain* line = (TigerDB::Chain*)oh.Lock();
-			int rec = line->dbAddress();
-			assert(rec == recPtr);
-			tlidMap.insert({ tlid, recPtr });
-			oh.Unlock();
-		}
-#endif
-
-#ifdef TESTING_POLYGON
-		// Creating a polygon
-		ObjHandle po;
-
-		if ((err= tDB.NewObject(DB_TIGER_POLY, po/*, id*/)) != 0)
-		{
-			fprintf(stderr, "**dbOM.newObject failed\n");
-		}
-
-		TigerDB::Polygon* poly = (TigerDB::Polygon*)po.Lock();
-
-		poly->SetCode(TigerDB::HYDRO_PerennialLakeOrPond);
-		poly->SetArea(0.000005);
-		Range2D range;
-		range.y.min = 44.4465;
-		range.x.min = -69.2176;
-		range.y.max = 44.4488;
-		range.x.max = -69.2134;
-		poly->SetMBR(range);
-
-		poly->write();
-		//po.Unlock();
-		tDB.Add(po);
-
-		ObjHandle eh1;
-		std::map<int, int>::iterator it = tlidMap.find(75629639);
-		err = tDB.Read(it->second, eh1);
-
-		err = poly->AddEdge(eh1, 1);
-
-		ObjHandle eh2;
-		it = tlidMap.find(75629638);
-		err = tDB.Read(it->second, eh2);
-		err = poly->AddEdge(eh2, 0);
-
-		tDB.TrBegin();
-		tDB.TrEnd();
-#endif
-		if (doHydro)
-		{
-			int nLines;
-			long newId = 0;
-			CString blockTable = baseName + "blocks";
-			CString equivTable = baseName + "equiv";
-
-			/*DbBlocks blks(&db);
-			blks.m_strFilter = "blkl like '%99%' OR blkr like '%99%'";
-			blks.Open(CRecordset::forwardOnly, blockTable, CRecordset::readOnly);
-			while (!blks.IsEOF())
-			{
-				printf("TLID: %d\n", blks.m_tlid);
-				blks.MoveNext();
-			}*/
-
-			LineTable lTable(1 << 16);
-			NodeTable nTable;
-
-			lineIds.SetSize(10000, 1000);
-
-			if ((nLines = GetWaterLines(db, blockTable, countyFips, lineIds)) <= 0)
-			{
-				fprintf(stderr, "Error getting Hydro lines: %s\n", (char *)(LPCTSTR)blockTable);
-				return -1;
-			}
-
-			int nClosureLines = AddClosureLines(tlidMap, tDB, lineIds, nLines);
-			fprintf(stderr, "\nNumber of Closure Lines: %d\n", nClosureLines);
-
-			int count = 0;
-
-#ifdef TEST_HYDRO
-			CDbLines lines(&db, 0);
-			lines.m_strFilter = "(DFCC = 111)";
-			lines.Open(CRecordset::forwardOnly, lineTable, CRecordset::readOnly);
-			while (!lines.IsEOF())
-			{
-				CDbLines::Id tlid = lines.GetTLID();
-				int i;
-
-				for (i = 0; i < nLines; i++)
-				{
-					long id;
-					if ((id = lineIds[i]) == tlid || id == -tlid)
-					{
-						break;
-					}
-				}
-
-				if (i == nLines)
-				{
-					count++;
-					lineIds.Add(tlid);
-				}
-
-				lines.MoveNext();
-			}
-			lines.Close();
-#endif
-			fprintf(stderr, "\nNumber of Lines: %d\n", nLines);
-
-			//FillPolyTables(tlidMap, tDB, nLines, lineIds, lTable, nTable);
-			//fprintf(stderr, "\nNumber of Nodes: %d\n", nTable.GetNumItems());
-/**/
-			int stateCode = 23;
-			int nPolys = BuildPoly3(tDB, /*tlidMap,*/ "HYDRO", OPEN_WATER, 0, lineIds, nLines + count,
-				/*lTable, nTable,*/ stateCode, TString(baseName), &newId, nLines, "ISLAND", 121);
-			fprintf(stderr, "Number of polygons: %ld\n", nPolys);
-/**/
-			long tSize,
-				nEntries;
-			int maxBucket;
-			float average;
-
-			tSize = lTable.GetStats(&nEntries, &maxBucket, &average);
-			fprintf(stderr, "LineTable - Size:%ld, Buckets Used:%ld, Objects:%ld, Max chain:%d, Avg:%lf\n",
-				tSize, nEntries, lTable.GetNumItems(), maxBucket, (double)average);
-
-			tSize = nTable.GetStats(&nEntries, &maxBucket, &average);
-			fprintf(stderr, "NodeTable - Size:%ld, Buckets Used:%ld, Objects:%ld, Max chain:%d, Avg:%lf\n",
-				tSize, nEntries, nTable.GetNumItems(), maxBucket, (double)average);
-
-			lTable.Flush();
-			nTable.Flush();
-		}
-		tDB.Close();
-		db.Close();
-	}
-	catch (CDBException* e)
-	{
-		fprintf(stderr, "* PolyMake: DB err: %s\n", e->m_strError);
-		fprintf(stderr, "%s\n", e->m_strStateNativeOrigin);
-		e->Delete();
-	}
-	catch (CMemoryException* e)
-	{
-		fprintf(stderr, "* PolyMake: memory exception\n");
-		e->Delete();
-	}
-	catch (CException* e)
-	{
-		fprintf(stderr, "* PolyMake: C exception\n");
-		e->Delete();
-	}
-	catch (...)
-	{
-		fprintf(stderr, "* PolyMake: other exception\n");
-	}
-
-	return(0);
-}
-

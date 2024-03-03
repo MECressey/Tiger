@@ -150,6 +150,7 @@
     <Library Include="..\..\Lib2\GeoToolsDLL.lib" />
     <Library Include="..\..\Lib2\SetsDLL.lib" />
     <Library Include="..\..\Lib2\TigerDBDLL.lib" />
+    <Library Include="..\..\Lib2\TopoToolsDLL.lib" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
