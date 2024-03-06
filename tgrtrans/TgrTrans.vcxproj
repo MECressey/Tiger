@@ -129,7 +129,7 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalIncludeDirectories>\Work\Inc2;..\tigerlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>\Work\inc;..\tigerlib;%(AdditionalIncludeDirectories)ent options&gt;</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_WINDOWS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AssemblerListingLocation>.\WinDebug\</AssemblerListingLocation>
       <PrecompiledHeaderOutputFile>.\WinDebug\TgrTrans.pch</PrecompiledHeaderOutputFile>
@@ -200,6 +200,7 @@
       <PrecompiledHeaderOutputFile>.\WinRel\TgrTrans.pch</PrecompiledHeaderOutputFile>
       <ObjectFileName>.\WinRel\</ObjectFileName>
       <ProgramDataBaseFileName>.\WinRel\</ProgramDataBaseFileName>
+      <AdditionalIncludeDirectories>\Work\inc;..\tigerlib;%(AdditionalIncludeDirectories)ent options&gt;</AdditionalIncludeDirectories>
     </ClCompile>
     <Midl>
       <TypeLibraryName>.\WinRel\TgrTrans.tlb</TypeLibraryName>
@@ -242,20 +243,18 @@
     <ClInclude Include="tgrnames.h" />
   </ItemGroup>
   <ItemGroup>
-    <Library Include="..\..\Lib2\CxxToolsLib.lib" />
-    <Library Include="..\..\Lib2\DabIODLL.lib" />
-    <Library Include="..\..\Lib2\DbOMDLL.lib" />
-    <Library Include="..\..\Lib2\GeoDBDLL.lib" />
-    <Library Include="..\..\Lib2\GeoToolsDLL.lib" />
-    <Library Include="..\..\Lib2\SetsDLL.lib" />
-    <Library Include="..\..\Lib2\TigerDBDLL.lib" />
-    <Library Include="..\..\Lib2\TopoToolsDLL.lib" />
-    <Library Include="..\tigerlib\Debug\Tigerlib.lib" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\tigerlib\Tigerlib.vcxproj">
       <Project>{1d9e39a8-3b72-4970-93e3-b16eabcc55b4}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="..\..\lib\CxxToolsLib.lib" />
+    <Library Include="..\..\lib\DbOMDLL.lib" />
+    <Library Include="..\..\lib\GeoDBDLL.lib" />
+    <Library Include="..\..\lib\GeoToolsDLL.lib" />
+    <Library Include="..\..\lib\SetsDLL.lib" />
+    <Library Include="..\..\lib\TigerDBDLL.lib" />
+    <Library Include="..\..\lib\TopoToolsDLL.lib" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

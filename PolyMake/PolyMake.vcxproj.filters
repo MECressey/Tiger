@@ -52,12 +52,12 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Library Include="..\..\Lib2\GeoDBDLL.lib" />
-    <Library Include="..\..\Lib2\DbOMDLL.lib" />
-    <Library Include="..\..\Lib2\SetsDLL.lib" />
-    <Library Include="..\..\Lib2\CxxToolsLib.lib" />
-    <Library Include="..\..\Lib2\GeoToolsDLL.lib" />
-    <Library Include="..\..\Lib2\TigerDBDLL.lib" />
-    <Library Include="..\..\Lib2\TopoToolsDLL.lib" />
+    <Library Include="..\..\lib\CxxToolsLib.lib" />
+    <Library Include="..\..\lib\DbOMDLL.lib" />
+    <Library Include="..\..\lib\GeoDBDLL.lib" />
+    <Library Include="..\..\lib\GeoToolsDLL.lib" />
+    <Library Include="..\..\lib\TigerDBDLL.lib" />
+    <Library Include="..\..\lib\TopoToolsDLL.lib" />
+    <Library Include="..\..\lib\SetsDLL.lib" />
   </ItemGroup>
 </Project>

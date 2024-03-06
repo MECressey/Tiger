@@ -52,6 +52,7 @@
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+    <UseOfMfc>Dynamic</UseOfMfc>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -105,7 +106,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>\Work\Inc2</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>\Work\inc</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -120,6 +121,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>\Work\inc</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -144,13 +146,13 @@
     <ClInclude Include="polynode.HPP" />
   </ItemGroup>
   <ItemGroup>
-    <Library Include="..\..\Lib2\CxxToolsLib.lib" />
-    <Library Include="..\..\Lib2\DbOMDLL.lib" />
-    <Library Include="..\..\Lib2\GeoDBDLL.lib" />
-    <Library Include="..\..\Lib2\GeoToolsDLL.lib" />
-    <Library Include="..\..\Lib2\SetsDLL.lib" />
-    <Library Include="..\..\Lib2\TigerDBDLL.lib" />
-    <Library Include="..\..\Lib2\TopoToolsDLL.lib" />
+    <Library Include="..\..\lib\CxxToolsLib.lib" />
+    <Library Include="..\..\lib\DbOMDLL.lib" />
+    <Library Include="..\..\lib\GeoDBDLL.lib" />
+    <Library Include="..\..\lib\GeoToolsDLL.lib" />
+    <Library Include="..\..\lib\SetsDLL.lib" />
+    <Library Include="..\..\lib\TigerDBDLL.lib" />
+    <Library Include="..\..\lib\TopoToolsDLL.lib" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

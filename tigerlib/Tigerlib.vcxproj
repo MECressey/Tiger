@@ -152,7 +152,7 @@
       <ObjectFileName>.\Debug\</ObjectFileName>
       <ProgramDataBaseFileName>.\Debug\</ProgramDataBaseFileName>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
-      <AdditionalIncludeDirectories>\Work\Inc2</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>\Work\inc</AdditionalIncludeDirectories>
     </ClCompile>
     <ResourceCompile>
       <Culture>0x0409</Culture>
@@ -209,6 +209,7 @@
       <PrecompiledHeaderOutputFile>.\Release\Tigerlib.pch</PrecompiledHeaderOutputFile>
       <ObjectFileName>.\Release\</ObjectFileName>
       <ProgramDataBaseFileName>.\Release\</ProgramDataBaseFileName>
+      <AdditionalIncludeDirectories>\Work\inc</AdditionalIncludeDirectories>
     </ClCompile>
     <ResourceCompile>
       <Culture>0x0409</Culture>
@@ -222,6 +223,11 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <OutputFile>.\Release\Tigerlib.lib</OutputFile>
     </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Template|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>\Work\inc</AdditionalIncludeDirectories>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="SCAN.CPP" />
