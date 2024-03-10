@@ -1,0 +1,1 @@
+Source code for the TgrTrans, PolyMake and tigercnv programs.  These program are used to translate TIGER/Line files (2006) to the NodeEdgePoly spatial database.  They also are used build polygons.  The tigercnv program is used to process the .RT5 files to a format that can be loaded into a SQL dastabase.
