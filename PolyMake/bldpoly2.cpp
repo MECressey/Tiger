@@ -641,7 +641,7 @@ FOUND_ONE :
 				range.x.max = -69.2134;*/
 				poly->setMBR(mbr);
 
-				err = poly->Write();
+				// err = poly->Write();  This is called in addToSpatialTree
 				//po.Unlock();
 				err = tDB.addToSpatialTree(po);
 

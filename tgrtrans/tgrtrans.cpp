@@ -737,27 +737,34 @@ NEXT_LINE :
 					line->userCode = cCode;
 					line->SetName(names, nNames);	// Don't store the actual names in the Chain (retrieve from the SQL database)
 					line->userId = rec1.tlid;			// TLID is unique
-					if ((error = line->Write()) != 0)	// We call Write() to assign an object space on the disk
+					/*if ((error = line->Write()) != 0)	// We call Write() to assign an object space on the disk
 					{
 						fprintf(stderr, "**DbOM::Write() failed\n");
 						goto CLEAN_UP;
-					}
+					}*/
 					//fprintf(mappingFile, "%ld\t%ld\n", rec1.tlid, line->dbAddress() );
 					fflush(stdout);
 
-					if ((error = tDB.dacInsert(line, line)) != 0)  // Insert the hashed object in the DAC
+					/*if ((error = tDB.dacInsert(line, line)) != 0)  // Insert the hashed object in the DAC
 					{
 						fprintf(stderr, "**tDB.dacInsert() failed\n");
 						goto CLEAN_UP;
 					}
-					dbo.Unlock();
+					dbo.Unlock();*/
 			
 					if ((error = tDB.addToSpatialTree( dbo )) != 0)
 					{
 						fprintf(stderr, "**tDB.Add() failed\n");
 						goto CLEAN_UP;
 					}
+					if ((error = tDB.dacInsert(line, line)) != 0)  // Insert the hashed object in the DAC
+					{
+						fprintf(stderr, "**tDB.dacInsert() failed\n");
+						goto CLEAN_UP;
+					}
+					dbo.Unlock();
 					error = line->Set((unsigned)nPoints, points);
+					assert(error == 0);
 
 					tDB.TrBegin();		// Do a transaction which writes all the records to the database for the chain
 					if ((error = tDB.TrEnd()) != 0)
@@ -1309,7 +1316,7 @@ NEXT_LINE :
 
 						break; // Don't create the Polygon now
 #endif
-						if ((err = tDB.NewDbObject(DB_POLY, po)) != 0)
+						if ((err = tDB.NewObject(DB_POLY, po)) != 0)
 						{
 							fprintf(stdout, "**dbOM.NewDbObject failed\n");
 						}
@@ -1464,7 +1471,7 @@ NEXT_LINE :
 				TigerDB::GNISFeatures fc = MapFeatureClassToCode(split[2]);
 
 				ObjHandle po;
-				if ((error = tDB.NewDbObject(DB_POINT, po)) != 0)
+				if ((error = tDB.NewObject(DB_POINT, po)) != 0)
 				{
 					fprintf(stderr, "**dbOM.NewDbObject failed: %ld\n", error);
 				}
