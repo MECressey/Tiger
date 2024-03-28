@@ -343,7 +343,7 @@ int main( int argc, char *argv[] )
 			}
 
 			TopoTools::TopoStats stats;
-			const Range2D range = tDB.getRange();
+			const Range2D range = tDB.getDBRange();
 			int err = TopoTools::buildTopology(tDB, range, &stats);
 			if (err != 0)
 				fprintf(stderr, "TopoTools::buildTopology() failed: %ld\n", err);
@@ -1473,7 +1473,7 @@ NEXT_LINE :
 				ObjHandle po;
 				if ((error = tDB.NewObject(DB_POINT, po)) != 0)
 				{
-					fprintf(stderr, "**dbOM.NewDbObject failed: %ld\n", error);
+					fprintf(stderr, "**dbOM.NewObject failed: %ld\n", error);
 				}
 
 				GeoDB::Point *point = (GeoDB::Point*)po.Lock();
