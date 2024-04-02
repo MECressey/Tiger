@@ -762,8 +762,12 @@ NEXT_LINE :
 						fprintf(stderr, "**tDB.dacInsert() failed\n");
 						goto CLEAN_UP;
 					}
-					dbo.Unlock();
 					error = line->Set((unsigned)nPoints, points);
+					dbo.Unlock();
+					assert(error == 0);
+
+					// Build topology on the fly
+					error = TopoTools::addNodeTopology(tDB, dbo);
 					assert(error == 0);
 
 					tDB.TrBegin();		// Do a transaction which writes all the records to the database for the chain
