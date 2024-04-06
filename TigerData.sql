@@ -1,3 +1,33 @@
+-- Tiger 2023
+CREATE TABLE MEFeatureNames (
+  stateFips tinyint NOT NULL,
+  countyFips smallint NOT NULL,
+  tlid int NOT NULL,
+  prefixDir varchar(15) NULL,
+  prefixType varchar(50) NULL,
+  prefixQual varchar(15) NULL,
+  baseName varchar(100) NULL,
+  suffixDir varchar(15) NULL,
+  suffixType varchar(50) NULL,
+  suffixQual varchar(15) NULL,
+  lineArid varchar(22) NULL,
+  PAFlag char(1) NOT NULL
+);
+
+--ALTER TABLE MEFeatureNames Don't have a unique primary key
+--  ADD CONSTRAINT [MEFeatureNames_PK] PRIMARY KEY(stateFips,countyFips,tlid,PAFlag);
+
+CREATE INDEX MEFeatureNamesIdx ON MEFeatureNames (stateFips,countyFips,tlid);
+
+BULK INSERT MEFeatureNames
+FROM 'C:\Work\Census\Data\Maine-2023\23027-Waldo\Featnames\tl_rd22_23027_featnamen.tab'
+WITH (
+  FIRSTROW = 2,
+  ROWTERMINATOR = '\n',
+  FIELDTERMINATOR = '\t',
+  TABLOCK
+);
+
 CREATE TABLE [MEblocks] (
   county smallint NOT NULL,
   tlid int NOT NULL,
@@ -67,6 +97,13 @@ WITH (
   ROWTERMINATOR = '\n',
   TABLOCK
 );
+-- query to link 23Names and TgrNames together (used by NameLook.cpp)
+select tlid, t2.feat, rtsq, dirp, name, type, dirs
+from [23Names] t1, tgrnames t2
+where t1.feat = t2.feat
+and tlid = 75631525
+and t1.state = t2.state and t1.county = t2.county
+and t1.state = 23 and t2.county = 27;
 
 INSERT INTO DistNames (name)
 SELECT DISTINCT name FROM TgrNames;

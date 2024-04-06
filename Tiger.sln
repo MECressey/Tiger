@@ -15,6 +15,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PolyMake", "PolyMake\PolyMake.vcxproj", "{C2CAA233-5774-42C9-A376-A37D59623145}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TgrTransSHP", "TgrTransSHP\TgrTransSHP.vcxproj", "{18071DD1-757D-4F1E-B876-C27B432C6CF3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -85,6 +87,18 @@ Global
 		{C2CAA233-5774-42C9-A376-A37D59623145}.Template|x64.Build.0 = Debug|x64
 		{C2CAA233-5774-42C9-A376-A37D59623145}.Template|x86.ActiveCfg = Debug|Win32
 		{C2CAA233-5774-42C9-A376-A37D59623145}.Template|x86.Build.0 = Debug|Win32
+		{18071DD1-757D-4F1E-B876-C27B432C6CF3}.Debug|x64.ActiveCfg = Debug|x64
+		{18071DD1-757D-4F1E-B876-C27B432C6CF3}.Debug|x64.Build.0 = Debug|x64
+		{18071DD1-757D-4F1E-B876-C27B432C6CF3}.Debug|x86.ActiveCfg = Debug|Win32
+		{18071DD1-757D-4F1E-B876-C27B432C6CF3}.Debug|x86.Build.0 = Debug|Win32
+		{18071DD1-757D-4F1E-B876-C27B432C6CF3}.Release|x64.ActiveCfg = Release|x64
+		{18071DD1-757D-4F1E-B876-C27B432C6CF3}.Release|x64.Build.0 = Release|x64
+		{18071DD1-757D-4F1E-B876-C27B432C6CF3}.Release|x86.ActiveCfg = Release|Win32
+		{18071DD1-757D-4F1E-B876-C27B432C6CF3}.Release|x86.Build.0 = Release|Win32
+		{18071DD1-757D-4F1E-B876-C27B432C6CF3}.Template|x64.ActiveCfg = Debug|x64
+		{18071DD1-757D-4F1E-B876-C27B432C6CF3}.Template|x64.Build.0 = Debug|x64
+		{18071DD1-757D-4F1E-B876-C27B432C6CF3}.Template|x86.ActiveCfg = Debug|Win32
+		{18071DD1-757D-4F1E-B876-C27B432C6CF3}.Template|x86.Build.0 = Debug|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
