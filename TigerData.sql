@@ -20,7 +20,7 @@ CREATE TABLE MEFeatureNames (
 CREATE INDEX MEFeatureNamesIdx ON MEFeatureNames (stateFips,countyFips,tlid);
 
 BULK INSERT MEFeatureNames
-FROM 'C:\Work\Census\Data\Maine-2023\23027-Waldo\Featnames\tl_rd22_23027_featnamen.tab'
+FROM 'C:\Work\Census\Data\Maine-2023\23013-Knox\Featnames\tl_2023_23013_featnamen.tab'
 WITH (
   FIRSTROW = 2,
   ROWTERMINATOR = '\n',
@@ -105,8 +105,16 @@ and tlid = 75631525
 and t1.state = t2.state and t1.county = t2.county
 and t1.state = 23 and t2.county = 27;
 
+-- 2006 
 INSERT INTO DistNames (name)
 SELECT DISTINCT name FROM TgrNames;
 
 SELECT DISTINCT name FROM TgrNames
 where county = 13;
+
+--2023
+INSERT INTO DistNames (name)
+select distinct baseName from MEFeatureNames WHERE prefixType IS NULL AND baseName is NOT NULL
+UNION select distinct prefixType + ' ' + baseName from MEFeatureNames WHERE prefixType IS NOT NULL AND prefixQual IS NULL
+UNION select distinct prefixQual + ' ' + baseName from MEFeatureNames WHERE prefixQual IS NOT NULL AND prefixType IS NULL
+UNION select distinct prefixQual + ' ' + prefixType + ' ' + baseName from MEFeatureNames WHERE prefixQual IS NOT NULL AND prefixType IS NOT NULL;

@@ -11,6 +11,8 @@
 #include "shapefil.h"
 #include "TString.h"
 #include "tigerdb.hpp"
+#include "TopoTools.h"
+#include "featNameLook.h"
 
 using namespace std;
 
@@ -18,7 +20,9 @@ static short GetStateFips(const char*);
 static short GetCountyFips(const char*);
 static TigerDB::Classification MapMTFCC(const char* mtfcc);
 
-const char* FILE_PREFIX = _T("tl_rd22_");
+const char* FILE_PREFIX = _T("tl_2023_")/*_T("tl_rd22_")*/;
+
+static XY_t points[15000];
 
 int main(int argc, char* argv[])
 {
@@ -61,26 +65,28 @@ int main(int argc, char* argv[])
     SHPHandle shp;
     short countyFips = 0;
     int		stateFips = 0;
+		CDatabase db;
+		db.SetQueryTimeout(60 * 10);
+		db.Open(_T("TigerBase"), FALSE, TRUE, _T("ODBC;"), FALSE);
+		TigerDB tDB(&db);
 
+		CString inputFileName = argv[1];
+		int dirIdx = inputFileName.Find(FILE_PREFIX);
+		int dotIdx = inputFileName.ReverseFind('.');
+		if (dotIdx == -1)
+			dotIdx = inputFileName.GetLength() - 1;
+		CString rootName = inputFileName.Left(dotIdx);
+		cout << "\nRoot name: " << rootName << endl;
+		//printf("\nRoot name: %s\n", (const char*)rootName);
+
+		CString baseName = rootName;
+		countyFips = GetCountyFips(baseName);
+		stateFips = GetStateFips(baseName);
     if (doNames)
     {
       dbf = DBFOpen(argv[1], "rb");
       int fieldCount = DBFGetFieldCount(dbf);
       int recCount = DBFGetRecordCount(dbf);
-
-      CString inputFileName = argv[1];
-
-      int dirIdx = inputFileName.Find(FILE_PREFIX);
-      int dotIdx = inputFileName.ReverseFind('.');
-      if (dotIdx == -1)
-        dotIdx = inputFileName.GetLength() - 1;
-      CString rootName = inputFileName.Left(dotIdx);
-      cout << "\nRoot name: " << rootName << endl;
-      //printf("\nRoot name: %s\n", (const char*)rootName);
-
-      CString baseName = rootName;
-      countyFips = GetCountyFips(baseName);
-      stateFips = GetStateFips(baseName);
 
       CString fName = rootName + "n.tab";
       FILE* tabNames;
@@ -90,7 +96,7 @@ int main(int argc, char* argv[])
         goto ERR_RETURN;
       }
 
-      fprintf(tabNames, "StateFIPS\tCountyFIPS\t\TLID\tPrefixDir\tPrefixType\tPrefixQual\tBaseName\tSuffixDir\tSuffixType\tSuffixQual\tLineArid\tPAFlag\n");
+      fprintf(tabNames, "StateFIPS\tCountyFIPS\tTLID\tPrefixDir\tPrefixType\tPrefixQual\tBaseName\tSuffixDir\tSuffixType\tSuffixQual\tLineArid\tPAFlag\n");
 /*
       for (int i = 0; i < fieldCount; i++)
       {
@@ -142,7 +148,7 @@ int main(int argc, char* argv[])
         str = DBFReadStringAttribute(dbf, i, 17);   // PAFlag
         strcpy_s(paFlag, str);
         printf("  TLID: %d, Full: %s, Prefix: %s, Name: %s, Type: %s, Suffix: %s, MTFCC: %s, LinearId: %s\n", tlid, featName, prefixDir, baseName, suffixType, suffixDir, mtfcc, lineArid);
-        fprintf(tabNames, "%d\t%d\t\%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", stateFips, countyFips, tlid, prefixDir, prefixType, prefixQualifier,
+        fprintf(tabNames, "%d\t%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", stateFips, countyFips, tlid, prefixDir, prefixType, prefixQualifier,
             baseName, suffixDir, suffixType, suffixQualifier, lineArid, paFlag);
       }
       /**/
@@ -157,18 +163,54 @@ int main(int argc, char* argv[])
       int shapeType;
       double minBound,
         maxBound;
+			int error;
+			int recCount = 0;
+			featNameLook fNameLook(&db);
+			
+			// Initialize querying names
+			fNameLook.stateFips = stateFips;
+			fNameLook.countyFips = countyFips;
+			fNameLook.tlid = 0;
+			fNameLook.Open(CRecordset::forwardOnly, 0, CRecordset::readOnly);
+			while (!fNameLook.IsEOF())
+				fNameLook.MoveNext();
 
-      shp = SHPOpen(argv[1], "rb");
-      dbf = DBFOpen(argv[1], "rb");
+			if ((shp = SHPOpen(argv[1], "rb")) == 0)
+			{
+				fprintf(stderr, "* Cannot open Shapefile: %s\n", argv[1]);
+				goto ERR_RETURN;
+			}
+			dbf = DBFOpen(argv[1], "rb");
+
+			std::string version;
+			if ((error = tDB.Open(TString(argv[3]), version, 1)) != 0)
+			{
+				fprintf(stderr, "* Cannot open Tiger DB: %s\n", argv[3]);
+				goto CLEAN_UP;
+			}
 
       SHPGetInfo(shp, &nEntities, &shapeType, &minBound, &maxBound);
       std::cout << "Number of entities: " << nEntities << ", Shape Type: " << shapeType << ", Min/Max: " << minBound << ", " << maxBound << std::endl;
-      int recCount = DBFGetRecordCount(dbf);
+      recCount = DBFGetRecordCount(dbf);
       assert(nEntities == recCount);
       for (int i = 0; i < nEntities; i++)
       {
         SHPObject* so = SHPReadObject(shp, i);
-        printf("ID: %d, Parts: %d, Vertices: %d\n", so->nShapeId, so->nParts, so->nVertices);
+        printf("ID: %d, Type: %d, Parts: %d, Vertices: %d\n", so->nShapeId, so->nSHPType, so->nParts, so->nVertices);
+				assert(so->nParts == 1);
+
+				Range2D mbr;
+				mbr.x.min = so->dfXMin;
+				mbr.x.max = so->dfXMax;
+				mbr.y.min = so->dfYMin;
+				mbr.y.max = so->dfYMax;
+
+				for (int p = 0; p < so->nVertices; p++)
+				{
+					points[p].x = so->padfX[p];
+					points[p].y = so->padfY[p];
+				}
+
         int tlid = DBFReadIntegerAttribute(dbf, i, 2);
         char mtfcc[6];
         char fullName[101];
@@ -182,9 +224,116 @@ int main(int argc, char* argv[])
 				if (cCode == TigerDB::NotClassified)
 					printf("** Unclassifed MTFCC\n");
 
+				TigerDB::Name names[5];
+				int nNames = 0;
+
+				fNameLook.tlid = tlid;
+				fNameLook.Requery();
+
+				while (!fNameLook.IsEOF())
+				{
+					CString name = fNameLook.m_prefixQual;
+					if (! name.IsEmpty())
+						name += _T(' ');
+					name += fNameLook.m_prefixType;
+					if (!fNameLook.m_prefixType.IsEmpty())
+						name += _T(' ');
+					name += fNameLook.m_name;
+
+					if (mtfcc[0] == 'S')  // Reat only streets
+					{
+						struct ReatRec
+						{
+							const TCHAR* name;
+							TigerDB::Classification baseCode;
+						};
+
+						static const ReatRec ReatRecs[] =
+						{
+							{_T("I -"),					TigerDB::ROAD_PrimaryLimitedAccess},
+							{_T("I- "),					TigerDB::ROAD_PrimaryLimitedAccess},
+							{_T("US Hwy "),			TigerDB::ROAD_PrimaryUnlimitedAccess},
+							{_T("State Hwy "),	TigerDB::ROAD_SecondaryAndConnecting}
+						};
+						int pos;
+						for (int k = sizeof(ReatRecs) / sizeof(ReatRecs[0]); --k >= 0; )
+						{
+							if ((pos = name.Find(ReatRecs[k].name)) != -1)
+							{
+								if (cCode > ReatRecs[k].baseCode || cCode == TigerDB::ROAD_MajorCategoryUnknown)
+								{
+									cCode = ReatRecs[k].baseCode;
+									printf("  Reated line %ld to %d\n", tlid, cCode);
+									break;
+								}
+							}
+						}
+					}
+
+					if (!name.IsEmpty())
+					{
+						::_tcscpy(names[nNames].name, name);
+						::_tcscpy(names[nNames].type, fNameLook.m_suffixType.TrimRight());
+						::_tcscpy(names[nNames].prefix, fNameLook.m_prefixDir.TrimRight());
+						::_tcscpy(names[nNames].suffix, fNameLook.m_suffixDir.TrimRight());
+
+						nNames++;
+					}
+					fNameLook.MoveNext();
+				}
+//#ifdef SAVE_FOR_NOW
+				ObjHandle dbo;
+				// Create a new object in memory and set some of it's data.  An Edge (Chain) is a variable length object, so we
+				// want to create it first before we allocate disk space for it.
+				if ((error = tDB.NewObject(DB_EDGE, dbo)) != 0)
+				{
+					fprintf(stderr, "**dbOM.newObject failed\n");
+					goto CLEAN_UP;
+				}
+
+				TigerDB::Chain* line = (TigerDB::Chain*)dbo.Lock();
+
+				line->setMBR(mbr);
+
+				line->userCode = cCode;
+				if (nNames > 0)
+					line->SetName(names, nNames);	// Don't store the actual names in the Chain (retrieve from the SQL database)
+				line->userId = tlid;			// TLID is unique
+				fflush(stdout);
+
+				if ((error = tDB.addToSpatialTree(dbo)) != 0)
+				{
+					fprintf(stderr, "**tDB.Add() failed\n");
+					goto CLEAN_UP;
+				}
+				if ((error = tDB.dacInsert(line, line)) != 0)  // Insert the hashed object in the DAC
+				{
+					fprintf(stderr, "**tDB.dacInsert() failed\n");
+					goto CLEAN_UP;
+				}
+				error = line->Set((unsigned)so->nVertices, points);
+				dbo.Unlock();
+				assert(error == 0);
+#ifdef SAVE_FOR_NOW
+				// Build topology on the fly
+				error = TopoTools::addNodeTopology(tDB, dbo);
+				assert(error == 0);
+#endif
+				tDB.TrBegin();		// Do a transaction which writes all the records to the database for the chain
+				if ((error = tDB.TrEnd()) != 0)
+				{
+					fprintf(stderr, "**tDB.TrEnd() failed\n");
+					goto CLEAN_UP;
+				}
+//#endif
         SHPDestroyObject(so);
       }
+		CLEAN_UP:
+			if (db.IsOpen())
+				db.Close();
 
+			if (tDB.IsOpen())
+				tDB.Close();
       std::cout << "Closing shapefile" << std::endl;
 
       DBFClose(dbf);
@@ -204,7 +353,7 @@ int main(int argc, char* argv[])
 
 	USAGE_ERROR:
 		printf("Usage: TgrTransSHP...\n");
-		printf("  <featNames> /n <.gdb filename> : Reads names from the Featue Names DBF file a <TGR*n.tab> with names in it\n");
+		printf("  <featNames> /n <.gdb filename> : Reads names from the Feature Names DBF file a <TGR*n.tab> with names in it\n");
 
 	ERR_RETURN:
 		return(-1);
@@ -319,7 +468,7 @@ static TigerDB::Classification MapMTFCC(const char* mtfcc)
 		}
 		break;
 
-	case 'H':
+	case 'H':		// Hydrography
 		switch (mtfccNum)
 		{
 		default:
@@ -485,7 +634,7 @@ static TigerDB::Classification MapMTFCC(const char* mtfcc)
 			code = TigerDB::NVF_PropertyLine;
 			break;
 		case 4150:	// Coastline
-			code = TigerDB::HYDRO_WaterBoundaryInlandVsCoastal;
+			code = TigerDB::HYDRO_PerennialShoreline/*TigerDB::HYDRO_WaterBoundaryInlandVsCoastal*/;
 			break;
 		case 4165:
 			code = TigerDB::ROAD_FerryCrossing;
@@ -514,7 +663,7 @@ static TigerDB::Classification MapMTFCC(const char* mtfcc)
 		}
 		break;
 
-	case 'R':
+	case 'R':	// Rail
 		switch (mtfccNum)
 		{
 		default:
@@ -539,7 +688,7 @@ static TigerDB::Classification MapMTFCC(const char* mtfcc)
 			code = TigerDB::ROAD_SecondaryAndConnecting;
 			break;
 		case 1400:
-			code = TigerDB::ROAD_SecondaryAndConnecting;
+			code = TigerDB::ROAD_LocalNeighborhoodAndRural;
 			break;
 		case 1500:
 			code = TigerDB::ROAD_VehicularTrail;

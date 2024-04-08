@@ -132,14 +132,20 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="featNameLook.cpp" />
     <ClCompile Include="TgrTransSHP.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\lib\DbOMDLL.lib" />
     <Library Include="..\..\lib\GeoDBDLL.lib" />
+    <Library Include="..\..\lib\GeoToolsDLL.lib" />
     <Library Include="..\..\lib\SetsDLL.lib" />
     <Library Include="..\..\lib\ShapefileLib.lib" />
     <Library Include="..\..\lib\TigerDBDLL.lib" />
+    <Library Include="..\..\lib\TopoToolsDLL.lib" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="featNameLook.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
