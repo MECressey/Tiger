@@ -33,6 +33,9 @@
     <ClCompile Include="bldpoly2.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="DBEdgeFaces.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DbBlocks.h">
@@ -48,6 +51,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="bldpoly2.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DBEdgeFaces.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -28,7 +28,10 @@ int main(int argc, char* argv[])
 {
 	char buffer[512];
 	bool doNames = false,
-		doLines = false;
+		doLines = false,
+		doBlocks = false,
+		doFaces = false;
+
 	strcpy(buffer, argv[1]);
 	if (argc > 2 && (argv[2][0] == '/' || argv[2][0] == '-'))
 	{
@@ -49,6 +52,16 @@ int main(int argc, char* argv[])
 			case 'N':
 			case 'n':
 				doNames = true;
+				break;
+
+			case 'B':
+			case 'b':
+				doBlocks = true;
+				break;
+
+			case 'F':
+			case 'f':
+				doFaces = true;
 				break;
 			}
 			i++;
@@ -82,6 +95,7 @@ int main(int argc, char* argv[])
 		CString baseName = rootName;
 		countyFips = GetCountyFips(baseName);
 		stateFips = GetStateFips(baseName);
+
     if (doNames)
     {
       dbf = DBFOpen(argv[1], "rb");
@@ -182,6 +196,16 @@ int main(int argc, char* argv[])
 			}
 			dbf = DBFOpen(argv[1], "rb");
 
+			CString fName = rootName + "E.tab";
+			FILE* tabEdges;
+			if ((tabEdges = ::fopen(TString(fName), "w")) == 0)
+			{
+				printf("** Cannot create file %s\n", (const char*)fName);
+				goto ERR_RETURN;
+			}
+
+			fprintf(tabEdges, "StateFIPS\tCountyFIPS\tTLID\tTFIDL\tTFIDR\tZIPL\tZIPR\n");
+
 			std::string version;
 			if ((error = tDB.Open(TString(argv[3]), version, 1)) != 0)
 			{
@@ -212,13 +236,23 @@ int main(int argc, char* argv[])
 				}
 
         int tlid = DBFReadIntegerAttribute(dbf, i, 2);
+				int tfidl = DBFReadIntegerAttribute(dbf, i, 3),
+						tfidr = DBFReadIntegerAttribute(dbf, i, 4);
         char mtfcc[6];
+				char zipl[6],
+						 zipr[6];
         char fullName[101];
         const char *str = DBFReadStringAttribute(dbf, i, 5);   // MTFCC
         strcpy_s(mtfcc, str);
         str = DBFReadStringAttribute(dbf, i, 6);  // FullName
         strcpy_s(fullName, str);
+				str = DBFReadStringAttribute(dbf, i, 12);  // Zipl
+				strcpy_s(zipl, str);
+				str = DBFReadStringAttribute(dbf, i, 13);  // Zipr
+				strcpy_s(zipr, str);
         str = DBFReadStringAttribute(dbf, i, 15);  // HydroFlag
+
+				fprintf(tabEdges, "%d\t%d\t%d\t%d\t%d\t%s\t%s\n", stateFips, countyFips, tlid, tfidl, tfidr, zipl, zipr);
 
 				TigerDB::Classification cCode = MapMTFCC(mtfcc);
 				if (cCode == TigerDB::NotClassified)
@@ -314,11 +348,11 @@ int main(int argc, char* argv[])
 				error = line->Set((unsigned)so->nVertices, points);
 				dbo.Unlock();
 				assert(error == 0);
-#ifdef SAVE_FOR_NOW
+//#ifdef SAVE_FOR_NOW
 				// Build topology on the fly
 				error = TopoTools::addNodeTopology(tDB, dbo);
 				assert(error == 0);
-#endif
+//#endif
 				tDB.TrBegin();		// Do a transaction which writes all the records to the database for the chain
 				if ((error = tDB.TrEnd()) != 0)
 				{
@@ -329,6 +363,8 @@ int main(int argc, char* argv[])
         SHPDestroyObject(so);
       }
 		CLEAN_UP:
+			fclose(tabEdges);
+
 			if (db.IsOpen())
 				db.Close();
 
@@ -340,6 +376,88 @@ int main(int argc, char* argv[])
       SHPClose(shp);
       return 0;
     }
+
+		if (doFaces)
+		{
+			if ((dbf = DBFOpen(argv[1], "rb")) == 0)
+			{
+				fprintf(stderr, "* Cannot open DBF file: %s\n", argv[1]);
+			}
+			int fieldCount = DBFGetFieldCount(dbf);
+			int recCount = DBFGetRecordCount(dbf);
+
+			CString fName = rootName + "F.tab";
+			FILE* tabFaces;
+			if ((tabFaces = ::fopen(TString(fName), "w")) == 0)
+			{
+				printf("** Cannot create file %s\n", (const char*)fName);
+				goto ERR_RETURN;
+			}
+			fprintf(tabFaces, "StateFP\tCountyFP\tTFID\tTract\tBlkGroup\tBlk\tSuffix\tZCTA\tUACE\tPlaceFP\tLWFlag\n");
+			for (int i = 0; i < recCount; i++)
+			{
+				int tfid;
+				tfid = DBFReadIntegerAttribute(dbf, i, 0);
+				const char* str = DBFReadStringAttribute(dbf, i, 1);
+				short stateFips = atoi(str);
+				str = DBFReadStringAttribute(dbf, i, 2);
+				short countyFips = atoi(str);
+				char tract[7];
+				str = DBFReadStringAttribute(dbf, i, 3);
+				strcpy_s(tract, str);
+				char blkGroup[2];
+				str = DBFReadStringAttribute(dbf, i, 4);
+				strcpy_s(blkGroup, str);
+				char blk[5];
+				str = DBFReadStringAttribute(dbf, i, 5);
+				strcpy_s(blk, str);
+				char suffix1[2];
+				str = DBFReadStringAttribute(dbf, i, 6);
+				strcpy_s(suffix1, str);
+				char zcta[6];
+				str = DBFReadStringAttribute(dbf, i, 7);
+				strcpy_s(zcta, str);
+				char urbanAreaCode[6];
+				str = DBFReadStringAttribute(dbf, i, 8);
+				strcpy_s(urbanAreaCode, str);
+				str = DBFReadStringAttribute(dbf, i, 10); // current state FIPS
+				str = DBFReadStringAttribute(dbf, i, 11); // current county FIPS
+				str = DBFReadStringAttribute(dbf, i, 12); // current Tract code
+				str = DBFReadStringAttribute(dbf, i, 13); // current BG code
+				char placeFips[6];
+				str = DBFReadStringAttribute(dbf, i, 18); // current Place FIPS code
+				strcpy_s(placeFips, str);
+				char lwFlag[2];
+				str = DBFReadStringAttribute(dbf, i, 37); // current Place FIPS code
+				strcpy_s(lwFlag, str);
+				fprintf(tabFaces, "%d\t%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", stateFips, countyFips,
+					tfid, tract, blkGroup, blk, suffix1, zcta, urbanAreaCode, placeFips, lwFlag);
+			}
+			fclose(tabFaces);
+			DBFClose(dbf);
+		}
+
+		if (doBlocks)
+		{
+			if ((dbf = DBFOpen(argv[1], "rb")) == 0)
+			{
+				fprintf(stderr, "* Cannot open DBF file: %s\n", argv[1]);
+			}
+			int fieldCount = DBFGetFieldCount(dbf);
+			int recCount = DBFGetRecordCount(dbf);
+			for (int i = 0; i < fieldCount; i++)
+			{
+				char fieldName[80];
+				int fWidth;
+				int fDecimals;
+
+				DBFFieldType fieldType = DBFGetFieldInfo(dbf, i, fieldName, &fWidth, &fDecimals);
+				printf("Field %d, Name: %s, type: %d, width: %d\n", i, fieldName, fieldType, fWidth);
+			}
+			DBFClose(dbf);
+		}
+
+		return 0;
 	}
 	catch (CDBException* e)
 	{

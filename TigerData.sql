@@ -28,6 +28,54 @@ WITH (
   TABLOCK
 );
 
+CREATE TABLE MEEdgeFaces (
+  stateFips tinyint NOT NULL,
+  countyFips smallint NOT NULL,
+  tlid int NOT NULL,
+  tfidl int NOT NULL,
+  tfidr int NOT NULL,
+  zipl varchar(5) NULL,
+  zipr varchar(5) NULL,
+  CONSTRAINT [MEEdgeFaces_PK] PRIMARY KEY(stateFips,countyFips,tlid)
+);
+
+CREATE TABLE MEFaces (
+  stateFips tinyint NOT NULL,
+  countyFips smallint NOT NULL,
+  tfid int NOT NULL,
+  tract char(6) NOT NULL,
+  blkGroup char(1) NOT NULL,
+  blk char(4) NOT NULL,
+  suffix1 char(1) NULL,
+  zcta char(5) NULL,
+  ucae char(5) NULL,
+  placeFips char(5) NULL,
+  LWFlag char(1) NOT NULL,
+  CONSTRAINT [MEFaces_PK] PRIMARY KEY(stateFips,countyFips,tfid)
+);
+
+BULK INSERT MEFaces
+FROM 'C:\Work\Census\Data\Maine-2023\23027-Waldo\Faces\tl_2023_23027_faceF.tab'
+WITH (
+  FIRSTROW = 2,
+  ROWTERMINATOR = '\n',
+  FIELDTERMINATOR = '\t',
+  TABLOCK
+);
+
+BULK INSERT MEEdgeFaces
+FROM 'C:\Work\Census\Data\Maine-2023\23027-Waldo\Edges\tl_2023_23027_edgeE.tab'
+WITH (
+  FIRSTROW = 2,
+  ROWTERMINATOR = '\n',
+  FIELDTERMINATOR = '\t',
+  TABLOCK
+);
+
+select distinct tfidl from MEEdgeFaces
+union select distinct tfidr from MEEdgeFaces;
+
+-- Tiger 2006
 CREATE TABLE [MEblocks] (
   county smallint NOT NULL,
   tlid int NOT NULL,

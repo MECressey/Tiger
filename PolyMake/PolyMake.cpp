@@ -29,6 +29,7 @@
 #include "NODETABL.HPP"
 #include "polynode.HPP"
 #include "bldpoly2.h"
+#include "DbEdgeFaces.h"
 
 using namespace NodeEdgePoly;
 
@@ -121,6 +122,65 @@ static int GetWaterLines(CDatabase& db, LPCTSTR blkTable, int county, CArray<Geo
 	catch(CException *e)
 	{
 		printf("GetWaterLines: C exception\n");
+		nLines = -1;
+	}
+
+	return(nLines);
+}
+
+static int GetWaterLines2023(CDatabase& db, int stateFips, int countyFips, CArray<GeoDB::DirLineId, GeoDB::DirLineId&>& ids)
+{
+	int nLines = 0;
+
+	try
+	{
+		DbEdgeFaces edges(&db);
+		//
+		//	Get the Faces
+		//
+		edges.stateFips = stateFips;
+		edges.countyFips = countyFips;
+		//edges.m_strFilter = "tfidl IN (Select tfid from MEFaces where LWFlag = 'P') AND tfidr IN (Select tfid from MEFaces where LWFlag = 'L')";
+		//edges.m_strFilter = "LEFT OUTER JOIN MEFaces F1 ON tfidl = F1.tfid JOIN MEFaces F2 ON tfidr = F2.tfid WHERE(F1.LWFlag = 'L' OR F1.LWFLAG IS NULL) AND F2.LWFlag = 'P'";
+		edges.m_strFilter = "(F1.LWFlag = 'L' OR F1.LWFLAG IS NULL) AND F2.LWFlag = 'P'";
+		edges.Open(CRecordset::forwardOnly, _T("MEEdgeFaces LEFT OUTER JOIN MEFaces F1 ON tfidl = F1.tfid JOIN MEFaces F2 ON tfidr = F2.tfid"), CRecordset::readOnly);
+		//edges.Open(CRecordset::forwardOnly, _T("MEEdgeFaces"), CRecordset::readOnly);
+		while (!edges.IsEOF())
+		{
+			GeoDB::DirLineId lineId;
+
+			lineId.id = edges.m_tlid;
+			lineId.dir = 1/*0*/;
+
+			ids.SetAtGrow(nLines, lineId);
+			nLines++;
+			edges.MoveNext();
+		}
+		edges.Close();
+		edges.m_strFilter = "(F2.LWFlag = 'L' OR F2.LWFLAG IS NULL) AND F1.LWFlag = 'P'";
+		//edges.Requery();
+		edges.Open(CRecordset::forwardOnly, _T("MEEdgeFaces JOIN MEFaces F1 ON tfidl = F1.tfid LEFT OUTER JOIN MEFaces F2 ON tfidr = F2.tfid"), CRecordset::readOnly);
+		while (!edges.IsEOF())
+		{
+			GeoDB::DirLineId lineId;
+
+			lineId.id = edges.m_tlid;
+			lineId.dir = 0/*1*/;
+
+			ids.SetAtGrow(nLines, lineId);
+			nLines++;
+			edges.MoveNext();
+		}
+	}
+	catch (CDBException* e)
+	{
+		//	THROW_LAST();
+		printf("GetWaterLines2023: %s\n", e->m_strError);
+		nLines = -1;
+	}
+	catch (CException* e)
+	{
+		printf("GetWaterLines2023: C exception\n");
 		nLines = -1;
 	}
 
@@ -324,15 +384,16 @@ int main(int argc, char* argv[])
 			NodeTable nTable;
 */
 			lineIds.SetSize(10000, 1000);
-
-			if ((nLines = GetWaterLines(db, blockTable, countyFips, lineIds)) <= 0)
+			
+			if ((nLines = GetWaterLines2023(db, stateFips, countyFips, lineIds)) <= 0)
+			//if ((nLines = GetWaterLines(db, blockTable, countyFips, lineIds)) <= 0)
 			{
 				fprintf(stdout, "Error getting Hydro lines: %s\n", (char *)(LPCTSTR)blockTable);
 				return -1;
 			}
 
-			int nClosureLines = AddClosureLines(tlidMap, tDB, lineIds, nLines);
-			fprintf(stdout, "\nNumber of Closure Lines: %d\n", nClosureLines);
+			//int nClosureLines = AddClosureLines(tlidMap, tDB, lineIds, nLines);
+			//fprintf(stdout, "\nNumber of Closure Lines: %d\n", nClosureLines);
 
 			int count = 0;
 

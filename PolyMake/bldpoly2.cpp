@@ -992,6 +992,7 @@ int BuildPoly(
 			{
 
 				// Creating a polygon.  ISLANDS are coming out polygon - FIX LATER!!!
+#//ifdef SAVE_FOR_NOW
 				ObjHandle po;
 				int err;
 				if ((err = tDB.NewDbObject(DB_POLY, po)) != 0)
@@ -1069,6 +1070,7 @@ int BuildPoly(
 				{
 					fprintf(stdout, "**BuildPoly: TrEnd() failed: %ld\n", err);
 				}
+//#endif
 /*				if (islandName)
 				{
 					rval *= 0.5;
