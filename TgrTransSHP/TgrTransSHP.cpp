@@ -18,7 +18,7 @@ using namespace std;
 
 static short GetStateFips(const char*);
 static short GetCountyFips(const char*);
-static TigerDB::Classification MapMTFCC(const char* mtfcc);
+static TigerDB::MAFTCCodes MapMTFCC(const char* mtfcc);
 
 const char* FILE_PREFIX = _T("tl_2023_")/*_T("tl_rd22_")*/;
 
@@ -254,8 +254,9 @@ int main(int argc, char* argv[])
 
 				fprintf(tabEdges, "%d\t%d\t%d\t%d\t%d\t%s\t%s\n", stateFips, countyFips, tlid, tfidl, tfidr, zipl, zipr);
 
-				TigerDB::Classification cCode = MapMTFCC(mtfcc);
-				if (cCode == TigerDB::NotClassified)
+				TigerDB::MAFTCCodes cCode = MapMTFCC(mtfcc);
+				assert(cCode <= 255);
+				if (cCode == TigerDB::FeatureNotClassified)
 					printf("** Unclassifed MTFCC\n");
 
 				TigerDB::Name names[5];
@@ -279,22 +280,22 @@ int main(int argc, char* argv[])
 						struct ReatRec
 						{
 							const TCHAR* name;
-							TigerDB::Classification baseCode;
+							TigerDB::MAFTCCodes baseCode;
 						};
 
 						static const ReatRec ReatRecs[] =
 						{
-							{_T("I -"),					TigerDB::ROAD_PrimaryLimitedAccess},
-							{_T("I- "),					TigerDB::ROAD_PrimaryLimitedAccess},
-							{_T("US Hwy "),			TigerDB::ROAD_PrimaryUnlimitedAccess},
-							{_T("State Hwy "),	TigerDB::ROAD_SecondaryAndConnecting}
+							{_T("I -"),					TigerDB::ROAD_PrimaryRoad},
+							{_T("I- "),					TigerDB::ROAD_PrimaryRoad},
+							{_T("US Hwy "),			TigerDB::ROAD_SecondaryRoad},
+							{_T("State Hwy "),	TigerDB::ROAD_SecondaryRoad}
 						};
 						int pos;
 						for (int k = sizeof(ReatRecs) / sizeof(ReatRecs[0]); --k >= 0; )
 						{
 							if ((pos = name.Find(ReatRecs[k].name)) != -1)
 							{
-								if (cCode > ReatRecs[k].baseCode || cCode == TigerDB::ROAD_MajorCategoryUnknown)
+								if (cCode > ReatRecs[k].baseCode || cCode == TigerDB::FeatureNotClassified)
 								{
 									cCode = ReatRecs[k].baseCode;
 									printf("  Reated line %ld to %d\n", tlid, cCode);
@@ -507,10 +508,10 @@ static short GetCountyFips(const char* string)
 }
 
 // Census Feature Code Class - based on 2006 classification codes
-static TigerDB::Classification MapMTFCC(const char* mtfcc)
+static TigerDB::MAFTCCodes MapMTFCC(const char* mtfcc)
 {
 	int mtfccNum = atoi(&mtfcc[1]);
-	TigerDB::Classification code = TigerDB::NotClassified;
+	TigerDB::MAFTCCodes code = TigerDB::FeatureNotClassified;
 
 	switch (mtfcc[0])
 	{
@@ -525,51 +526,64 @@ static TigerDB::Classification MapMTFCC(const char* mtfcc)
 			fprintf(stderr, "*MapMTFCC - Unknown MTFCC C: %d\n", mtfccNum);
 			break;
 		case 3022:
-			code = TigerDB::PF_MountainPeak;
+			code = TigerDB::TOPO_MountainPeakSummit;
 			break;
 		case 3023:
-			code = TigerDB::PF_Island;
+			code = TigerDB::TOPO_Island;
 			break;
 		case 3024:
-			code = TigerDB::PF_Levee;
+			code = TigerDB::TOPO_Levee;
+			break;
+		case 3025:
+			code = TigerDB::TOPO_JettyBreakwater;
 			break;
 		case 3026:
-			code = TigerDB::PF_QuarryMine;
+			code = TigerDB::TOPO_Quarry;
 			break;
 		case 3027:
-			code = TigerDB::PF_Dam;
+			code = TigerDB::TOPO_Dam;
 			break;
 		case 3061:
-			code = TigerDB::ROAD_Cul_de_sac;
+			code = TigerDB::TOPO_CulDeSac;
 			break;
 		case 3062:
-			code = TigerDB::ROAD_TrafficCircle;
+			code = TigerDB::TOPO_TrafficCircle;
 			break;
 		case 3066:
+			code = TigerDB::TOPO_Gate;
+			break;
 		case 3067:
-			code = TigerDB::ROAD_BarrierToTravel;
+			code = TigerDB::TOPO_TollBooth;
 			break;
 		case 3071:
-			code = TigerDB::LM_Tower;
+			code = TigerDB::TOPO_Tower;
 			break;
 		case 3074:
-			code = TigerDB::LM_LighthouseBeacon;
+			code = TigerDB::TOPO_LighthouseBeacon;
 			break;
 		case 3075:
-			code = TigerDB::LM_Tank;
+			code = TigerDB::TOPO_Tank;
 			break;
 		case 3076:
-			code = TigerDB::LM_WindmillFarm;
+			code = TigerDB::TOPO_WindmillFarm;
 			break;
 		case 3077:
-			code = TigerDB::LM_SolarFarm;
+			code = TigerDB::TOPO_SolarFarm;
 			break;
 		case 3078:
-			code = TigerDB::LM_MonumentMemorial;
+			code = TigerDB::TOPO_Monument;
 			break;
 		case 3079:
+			code = TigerDB::TOPO_BoundaryMonument;
+			break;
 		case 3080:
-			code = TigerDB::LM_SurveyBoundaryMemorial;
+			code = TigerDB::TOPO_SurveyControlPoint;
+			break;
+		case 3081:
+			code = TigerDB::TOPO_LocalityPoint;
+			break;
+		case 3085:
+			code = TigerDB::TOPO_AlaskaNativeVillage;
 			break;
 		}
 		break;
@@ -580,8 +594,137 @@ static TigerDB::Classification MapMTFCC(const char* mtfcc)
 		default:
 			fprintf(stderr, "*MapMTFCC - Unknown MTFCC G: %d\n", mtfccNum);
 			break;
+		case 1000:
+			code = TigerDB::TAB_Nation;
+			break;
+		case 1100:
+			code = TigerDB::TAB_CensusRegion;
+			break;
+		case 1200:
+			code = TigerDB::TAB_CensusDivision;
+			break;
+		case 2100:
+			code = TigerDB::TAB_AIA;
+			break;
+		case 2120:
+			code = TigerDB::TAB_HH;
+			break;
+		case 2130:
+			code = TigerDB::TAB_ANVSA;
+			break;
+		case 2140:
+			code = TigerDB::TAB_OTSA;
+			break;
+		case 2150:
+			code = TigerDB::TAB_SDTSA;
+			break;
+		case 2160:
+			code = TigerDB::TAB_TDSA;
+			break;
+		case 2170:
+			code = TigerDB::TAB_AIJUA;
+			break;
+		case 2200:
+			code = TigerDB::TAB_AlaskaRegionalCorp;
+			break;
+		case 2300:
+			code = TigerDB::TAB_TribalSubdivision;
+			break;
+		case 2400:
+			code = TigerDB::TAB_TribalCensusTract;
+			break;
+		case 2410:
+			code = TigerDB::TAB_TribalBlockGroup;
+			break;
+		case 3100:
+			code = TigerDB::TAB_CombinedStatisicalArea;
+			break;
+		case 3110:
+			code = TigerDB::TAB_MetroStatisticalArea;
+			break;
+		case 3120:
+			code = TigerDB::TAB_MetropolitanDivision;
+			break;
+		case 3200:
+			code = TigerDB::TAB_NewEnglandCityTown;
+			break;
+		case 3210:
+			code = TigerDB::TAB_NewEnglandMetroStatArea;
+			break;
+		case 3220:
+			code = TigerDB::TAB_NewEngland_CityTownDiv;
+			break;
+		case 3500:
+			code = TigerDB::TAB_UrbanArea;
+			break;
+		case 4000:
+			code = TigerDB::TAB_StateFeature;
+			break;
+		case 4020:
+			code = TigerDB::TAB_CountyFeature;
+			break;
+		case 4040:
+			code = TigerDB::TAB_CountySubdivision;
+			break;
+		case 4050:
+			code = TigerDB::TAB_Estate;
+			break;
+		case 4060:
+			code = TigerDB::TAB_SubMinorCivilDivision;
+			break;
+		case 4110:
+			code = TigerDB::TAB_IncorporatedPlace;
+			break;
+		case 4120:
+			code = TigerDB::TAB_ConsolidatedCity;
+			break;
+		case 4210:
+			code = TigerDB::TAB_CensusDesignatedPlace;
+			break;
+		case 4300:
+			code = TigerDB::TAB_EconomicCensusPlace;
+			break;
+		case 5020:
+			code = TigerDB::TAB_CensusTract;
+			break;
+		case 5030:
+			code = TigerDB::TAB_CensusBlockGroup;
+			break;
+		case 5040:
+			code = TigerDB::TAB_Block;
+			break;
+		case 5200:
+			code = TigerDB::TAB_CongressionalDistrict;
+			break;
+		case 5210:
+			code = TigerDB::TAB_StateLegislativeDistrictUC;
+			break;
+		case 5220:
+			code = TigerDB::TAB_StateLegislativeDistrictLC;
+			break;
+		case 5240:
+			code = TigerDB::TAB_VotingDistrict;
+			break;
+		case 5400:
+			code = TigerDB::TAB_ElementarySchoolDistrict;
+			break;
+		case 5410:
+			code = TigerDB::TAB_SecondarySchoolDistrict;
+			break;
+		case 5420:
+			code = TigerDB::TAB_UnifiedSchoolDistrict;
+			break;
+		case 6120:
+			code = TigerDB::TAB_PUMA;
+			break;
+		case 6330:
+			code = TigerDB::TAB_UrbanGrowthArea;
+			break;
 		case 6350:
-			code = TigerDB::NVF_ZIPCodeBoundary;
+			code = TigerDB::TAB_ZIPCodeArea;
+			break;
+		case 6400:
+			code = TigerDB::TAB_PlanningRegion;
 			break;
 		}
 		break;
@@ -592,29 +735,35 @@ static TigerDB::Classification MapMTFCC(const char* mtfcc)
 		default:
 			fprintf(stderr, "*MapMTFCC - Unknown MTFCC H: %d\n", mtfccNum);
 			break;
+		case 1100:
+			code = TigerDB::HYDRO_Connector;
+			break;
 		case 2030:
-			code = TigerDB::HYDRO_PerennialLakeOrPond;
+			code = TigerDB::HYDRO_LakePond;
 			break;
 		case 2040:
-			code = TigerDB::HYDRO_PerennialReservoir;
+			code = TigerDB::HYDRO_Reservoir;
 			break;
 		case 2041:
 			code = TigerDB::HYDRO_TreatmentPond;
 			break;
 		case 2051:
-			code = TigerDB::HYDRO_BayEstuaryGulfOrSound;
+			code = TigerDB::HYDRO_BayEstuaryGulfSound;
 			break;
 		case 2053:
-			code = TigerDB::HYDRO_SeaOrOcean;
+			code = TigerDB::HYDRO_OceanSea;
+			break;
+		case 2081:
+			code = TigerDB::HYDRO_Glacier;
 			break;
 		case 3010:
-			code = TigerDB::HYDRO_PerennialStream;
+			code = TigerDB::HYDRO_StreamRiver;
 			break;
 		case 3013:
 			code = TigerDB::HYDRO_BraidedStream;
 			break;
 		case 3020:
-			code = TigerDB::HYDRO_PerennialCanalDitchOrAqueduct;
+			code = TigerDB::HYDRO_CanalDitchAqeduct;
 			break;
 		}
 		break;
@@ -625,104 +774,182 @@ static TigerDB::Classification MapMTFCC(const char* mtfcc)
 		default:
 			fprintf(stderr, "*MapMTFCC - Unknown MTFCC K: %d\n", mtfccNum);
 			break;
+		case 1121:
+			code = TigerDB::LIVING_ApartmentBuilding;
+			break;
+		case 1223:
+			code = TigerDB::LIVING_TrailerCourt;
+			break;
 		case 1225:
-			code = TigerDB::LM_CrewOfVessel;
+			code = TigerDB::LIVING_CrewOfVessel;
+			break;
+		case 1226:
+			code = TigerDB::LIVING_HousingFacility;
 			break;
 		case 1227:
-			code = TigerDB::LM_HotelOrMotel;
+			code = TigerDB::LIVING_HotelMotelResort;
 			break;
 		case 1228:
-			code = TigerDB::LM_Campground;
+			code = TigerDB::LIVING_Campground;
 			break;
 		case 1229:
-			code = TigerDB::LM_ShelterOrMission;
+			code = TigerDB::LIVING_ShelterMission;
 			break;
 		case 1231:
-			code = TigerDB::LM_Hospital;
+			code = TigerDB::LIVING_HospitalHospice;
 			break;
 		case 1233:
-			code = TigerDB::LM_NursingHome;
+			code = TigerDB::LIVING_NursingHome;
+			break;
+		case 1235:
+			code = TigerDB::LIVING_JuvenileInstitution;
 			break;
 		case 1236:
-			code = TigerDB::LM_Jail;
+			code = TigerDB::LIVING_DententionCenter;
 			break;
 		case 1237:
-			code = TigerDB::LM_FederalOrStatePrison;
+			code = TigerDB::LIVING_FederalPenitentiary;
+			break;
+		case 1238:
+			code = TigerDB::LIVING_OtherCorrectional;
 			break;
 		case 1239:
-			code = TigerDB::LM_ConventOrMonastery;
+			code = TigerDB::LIVING_ConventMonasteryRectory;
+			break;
+		case 2100:
+			code = TigerDB::GOV_Governmental;
+			break;
+		case 2110:
+			code = TigerDB::GOV_MilitaryInstallation;
+			break;
+		case 2146:
+			code = TigerDB::GOV_CommunityCenter;
 			break;
 		case 2165:
-			code = TigerDB::LM_GovernmentCenter;
+			code = TigerDB::GOV_GovermentCenter;
 			break;
 		case 2167:
-			code = TigerDB::LM_ConventionCenter;
+			code = TigerDB::GOV_ConventionCenter;
 			break;
 		case 2180:		// Park
-			code = TigerDB::LM_OpenSpace;
+			code = TigerDB::GOV_Park;
 			break;
 		case 2181:
-			code = TigerDB::LM_NationalParkService;
+			code = TigerDB::PARK_NationalParkService;
 			break;
 		case 2182:
-			code = TigerDB::LM_NationalForestOrOther;
+			code = TigerDB::PARK_NationalForest;
+			break;
+		case 2183:
+			code = TigerDB::PARK_TribalPark;
 			break;
 		case 2184:
-			code = TigerDB::LM_StateOrLocalPark_Forest;
+			code = TigerDB::PARK_StateParkForest;
+			break;
+		case 2185:
+			code = TigerDB::PARK_RegionalParkForest;
+			break;
+		case 2186:
+			code = TigerDB::PARK_CountyParkForest;
+			break;
+		case 2187:
+			code = TigerDB::PARK_CountySubdivionPark;
+			break;
+		case 2188:
+			code = TigerDB::PARK_IncorporatedPlacePark;
+			break;
+		case 2189:
+			code = TigerDB::PARK_PrivateParkForest;
+			break;
+		case 2190:
+			code = TigerDB::PARK_OtherParkForest;
+			break;
+		case 2191:
+			code = TigerDB::GOV_PostOffice;
+			break;
+		case 2193:
+			code = TigerDB::GOV_FireDepartment;
 			break;
 		case 2195:
-			code = TigerDB::LM_Library;
+			code = TigerDB::GOV_Library;
+			break;
+		case 2196:
+			code = TigerDB::GOV_CityTownHall;
+			break;
+		case 2300:
+			code = TigerDB::WORK_CommericalWorkPlace;
 			break;
 		case 2361:
-			code = TigerDB::LM_ShoppingOrRetailCenter;
+			code = TigerDB::WORK_ShoppingCenter;
 			break;
 		case 2362:
-			code = TigerDB::LM_IndustrialBuildingOrPark;
+			code = TigerDB::WORK_IndustrialBuildingPark;
 			break;
 		case 2363:
-			code = TigerDB::LM_OfficebuildingOrPark;
+			code = TigerDB::WORK_OfficeBuildingPark;
 			break;
 		case 2364:
-			code = TigerDB::LM_VineyardWineryOrchard;
+			code = TigerDB::WORK_FarmVineyardOrchard;
 			break;
 		case 2366:
-			code = TigerDB::LM_Employmentcenter;
+			code = TigerDB::WORK_OtherEmploymentCenter;
 			break;
 		case 2400:
-			code = TigerDB::LM_TransportationTerminal;
+			code = TigerDB::WORK_TransportationTerminal;
+			break;
+		case 2424:
+			code = TigerDB::TT_Marina;
+			break;
+		case 2432:
+			code = TigerDB::TRANS_PierDock;
 			break;
 		case 2451:
-			code = TigerDB::LM_Airport;
+			code = TigerDB::TT_Airport;
 			break;
 		case 2452:
-			code = TigerDB::LM_TrainStation;
+			code = TigerDB::TT_TrainStation;
 			break;
 		case 2453:
-			code = TigerDB::LM_BusTerminal;
+			code = TigerDB::TT_BusTerminal;
 			break;
 		case 2454:
-			code = TigerDB::LM_MarineTerminal;
+			code = TigerDB::TT_MarineTerminal;
 			break;
 		case 2455:
-			code = TigerDB::LM_SeaplaneAnchorage;
+			code = TigerDB::TT_SeaplaneAnchorage;
 			break;
 		case 2457:
-			code = TigerDB::LM_AirportStatisticalRepresentation;
+			code = TigerDB::TT_Airport;
 			break;
 		case 2459:
-			code = TigerDB::ROAD_Runway_Taxiway;
+			code = TigerDB::TRANS_RunwayTaxiWay;
+			break;
+		case 2460:
+			code = TigerDB::TT_HelicopterLandingPad;
+			break;
+		case 2540:
+			code = TigerDB::OTHERWP_UniversityCollege;
+			break;
+		case 2543:
+			code = TigerDB::OTHERWP_SchoolAcademy;
 			break;
 		case 2545:
-			code = TigerDB::LM_Museum;
+			code = TigerDB::OTHERWP_MuseumVistorCenter;
 			break;
 		case 2561:
-			code = TigerDB::LM_GolfCourse;
+			code = TigerDB::OTHERWP_GolfCourse;
+			break;
+		case 2564:
+			code = TigerDB::OTHERWP_AmusementCenter;
 			break;
 		case 2582:
-			code = TigerDB::LM_Cemetery;
+			code = TigerDB::OTHERWP_Cemetery;
 			break;
 		case 2586:
-			code = TigerDB::LM_Zoo;
+			code = TigerDB::OTHERWP_Zoo;
+			break;
+		case 3544:
+			code = TigerDB::OTHERWP_PlaceOfWorkship;
 			break;
 		}
 		break;
@@ -734,28 +961,34 @@ static TigerDB::Classification MapMTFCC(const char* mtfcc)
 			fprintf(stderr, "*MapMTFCC - Unknown MTFCC L: %d\n", mtfccNum);
 			break;
 		case 4010:
-			code = TigerDB::MGT_Pipeline;
+			code = TigerDB::MISC_Pipeline;
 			break;
 		case 4020:
-			code = TigerDB::MGT_PowerLine;
+			code = TigerDB::MISC_Powerline;
 			break;
 		case 4031:
-			code = TigerDB::MGT_AerialTramway;
+			code = TigerDB::MISC_AerialTramway;
 			break;
 		case 4110:
-			code = TigerDB::PF_Fenceline;
+			code = TigerDB::MISC_FenceLine;
 			break;
 		case 4121:
-			code = TigerDB::PF_RidgeLine;
+			code = TigerDB::MISC_RidgeLine;
+			break;
+		case 4125:
+			code = TigerDB::MISC_Cliff;
+			break;
+		case 4130:
+			code = TigerDB::MISC_PointToPoint;
 			break;
 		case 4140:
-			code = TigerDB::NVF_PropertyLine;
+			code = TigerDB::MISC_PropertyLine;
 			break;
 		case 4150:	// Coastline
-			code = TigerDB::HYDRO_PerennialShoreline/*TigerDB::HYDRO_WaterBoundaryInlandVsCoastal*/;
+			code = TigerDB::MISC_Coastline;
 			break;
 		case 4165:
-			code = TigerDB::ROAD_FerryCrossing;
+			code = TigerDB::MISC_FerryCrossing;
 			break;
 		}
 		break;
@@ -767,16 +1000,16 @@ static TigerDB::Classification MapMTFCC(const char* mtfcc)
 			fprintf(stderr, "*MapMTFCC - Unknown MTFCC P: %d\n", mtfccNum);
 			break;
 		case 1:
-			code = TigerDB::NVF_LegalOrAdministrativeBoundary;
+			code = TigerDB::EDGE_NonvisibleLinearBoundary;
 			break;
 		case 2:
-			code = TigerDB::HYDRO_PerennialShoreline;
+			code = TigerDB::EDGE_PerennialShoreline;
 			break;
 		case 3:
-			code = TigerDB::HYDRO_IntermittentShoreline;
+			code = TigerDB::EDGE_IntermittentShoreline;
 			break;
 		case 4:  // Other non-visible edge (need a new code)
-			code = TigerDB::HYDRO_USGSClosureLine;
+			code = TigerDB::EDGE_OtherNonVisible;
 			break;
 		}
 		break;
@@ -788,7 +1021,7 @@ static TigerDB::Classification MapMTFCC(const char* mtfcc)
 			fprintf(stderr, "*MapMTFCC - Unknown MTFCC R: %d\n", mtfccNum);
 			break;
 		case 1011:
-			code = TigerDB::RR_MainLine;
+			code = TigerDB::RAIL_Rail;
 			break;
 		}
 		break;
@@ -800,37 +1033,49 @@ static TigerDB::Classification MapMTFCC(const char* mtfcc)
 			fprintf(stderr, "*MapMTFCC - Unknown MTFCC S: %d\n", mtfccNum);
 			break;
 		case 1100:
-			code = TigerDB::ROAD_PrimaryLimitedAccess;
+			code = TigerDB::ROAD_PrimaryRoad;
 			break;
 		case 1200:
-			code = TigerDB::ROAD_SecondaryAndConnecting;
+			code = TigerDB::ROAD_SecondaryRoad;
 			break;
 		case 1400:
-			code = TigerDB::ROAD_LocalNeighborhoodAndRural;
+			code = TigerDB::ROAD_LocalNeighborhoodRoad;
 			break;
 		case 1500:
-			code = TigerDB::ROAD_VehicularTrail;
+			code = TigerDB::ROAD_VehicularTrail4WD;
 			break;
 		case 1630:
-			code = TigerDB::ROAD_AccessRamp;
+			code = TigerDB::ROAD_Ramp;
 			break;
 		case 1640:
 			code = TigerDB::ROAD_ServiceDrive;
 			break;
 		case 1710:
+			code = TigerDB::ROAD_Walkway;
+			break;
 		case 1720:
+			code = TigerDB::ROAD_Stairway;
+			break;
 		case 1730:
+			code = TigerDB::ROAD_Alley;
+			break;
 		case 1740:
-			code = TigerDB::ROAD_OtherThoroughfare;
+			code = TigerDB::ROAD_PrivateRoad;
 			break;
 		case 1750:
-			code = TigerDB::ROAD_InternalUSCensusBureau;
+			code = TigerDB::ROAD_InternalCensusBureau;
 			break;
 		case 1780:
-			code = TigerDB::LM_ParkAndRide;
+			code = TigerDB::ROAD_ParkingLotRd;
+			break;
+		case 1810:
+			code = TigerDB::ROAD_WinterTrail;
 			break;
 		case 1820:
-			code = TigerDB::ROAD_VehicularTrail;
+			code = TigerDB::ROAD_BikePath;
+			break;
+		case 1830:
+			code = TigerDB::ROAD_BridlePath;
 			break;
 		}
 		break;
