@@ -19,6 +19,7 @@ using namespace std;
 static short GetStateFips(const char*);
 static short GetCountyFips(const char*);
 static TigerDB::MAFTCCodes MapMTFCC(const char* mtfcc);
+static int checkEquiv(GeoDB& db, int tlid, Range2D& mbr, XY_t pts[], int nPts, TigerDB::MAFTCCodes code);
 
 const char* FILE_PREFIX = _T("tl_2023_")/*_T("tl_rd22_")*/;
 
@@ -98,7 +99,11 @@ int main(int argc, char* argv[])
 
     if (doNames)
     {
-      dbf = DBFOpen(argv[1], "rb");
+			if ((dbf = DBFOpen(argv[1], "rb")) == 0)
+			{
+				fprintf(stderr, "* Cannot open DBF file: %s\n", argv[1]);
+				goto ERR_RETURN;
+			}
       int fieldCount = DBFGetFieldCount(dbf);
       int recCount = DBFGetRecordCount(dbf);
 
@@ -220,7 +225,7 @@ int main(int argc, char* argv[])
       for (int i = 0; i < nEntities; i++)
       {
         SHPObject* so = SHPReadObject(shp, i);
-        printf("ID: %d, Type: %d, Parts: %d, Vertices: %d\n", so->nShapeId, so->nSHPType, so->nParts, so->nVertices);
+        //printf("ID: %d, Type: %d, Parts: %d, Vertices: %d\n", so->nShapeId, so->nSHPType, so->nParts, so->nVertices);
 				assert(so->nParts == 1);
 
 				Range2D mbr;
@@ -252,12 +257,22 @@ int main(int argc, char* argv[])
 				strcpy_s(zipr, str);
         str = DBFReadStringAttribute(dbf, i, 15);  // HydroFlag
 
-				fprintf(tabEdges, "%d\t%d\t%d\t%d\t%d\t%s\t%s\n", stateFips, countyFips, tlid, tfidl, tfidr, zipl, zipr);
-
 				TigerDB::MAFTCCodes cCode = MapMTFCC(mtfcc);
 				assert(cCode <= 255);
 				if (cCode == TigerDB::FeatureNotClassified)
 					printf("** Unclassifed MTFCC\n");
+
+				fprintf(tabEdges, "%d\t%d\t%d\t%d\t%d\t%s\t%s\n", stateFips, countyFips, tlid, tfidl, tfidr, zipl, zipr);
+
+				int equivId = checkEquiv(tDB, tlid, mbr, points, so->nVertices, cCode);
+				if (equivId != 0)  // MoreToDo - can find equivalents in same dataset with different TLIDs.
+				{
+					assert(equivId == tlid);
+					printf("* %ld (%d) is equivalent to %ld\n", tlid, stateFips, equivId);
+					SHPDestroyObject(so);
+					continue;
+					//goto NEXT_EDGE;
+				}
 
 				TigerDB::Name names[5];
 				int nNames = 0;
@@ -361,6 +376,7 @@ int main(int argc, char* argv[])
 					goto CLEAN_UP;
 				}
 //#endif
+			//NEXT_EDGE:
         SHPDestroyObject(so);
       }
 		CLEAN_UP:
@@ -763,7 +779,7 @@ static TigerDB::MAFTCCodes MapMTFCC(const char* mtfcc)
 			code = TigerDB::HYDRO_BraidedStream;
 			break;
 		case 3020:
-			code = TigerDB::HYDRO_CanalDitchAqeduct;
+			code = TigerDB::HYDRO_CanalDitchAqueduct;
 			break;
 		}
 		break;
@@ -1083,3 +1099,80 @@ static TigerDB::MAFTCCodes MapMTFCC(const char* mtfcc)
 
 	return(code);
 }
+
+const double tol = 1.0e-6;
+
+static bool chainEqual(ObjHandle& oh, const Range2D &mbr, unsigned nPts, XY_t pts[], TigerDB::MAFTCCodes cCode)
+{
+	TigerDB::Chain* chain = (TigerDB::Chain*)oh.Lock();
+	XY_t sPt, ePt;
+	chain->getNodes(&sPt, &ePt);
+	const Range2D& range = chain->getMBR();
+	unsigned char code = chain->userCode;
+	int nPoints = chain->getNumPts();
+	oh.Unlock();
+
+	if (code != cCode || nPts != nPoints || !mbr.Equal(range))
+		return false;
+
+	if (sPt.Equal(pts[0], tol) && ePt.Equal(pts[nPts - 1], tol))  // Should compare all the points!
+		return true;
+
+	if (sPt.Equal(pts[nPts - 1], tol) && ePt.Equal(pts[0], tol))	// Edges are the same but in opposite directions
+		return true;
+	
+	return false;
+}
+
+static int checkEquiv(GeoDB &db, int tlid, Range2D &mbr, XY_t pts[], int nPts, TigerDB::MAFTCCodes code)
+{
+	ObjHandle fo;
+	int err;
+
+	DbObject::Id equivId = 0;
+	GeoDB::Edge::Hash dbHash;
+	dbHash.id = tlid;
+	if ((err = db.dacSearch(DB_EDGE, &dbHash, fo)) == 0)	// Sometimes the chains share a common TLID between counties
+	{
+		bool equiv = chainEqual(fo, mbr, nPts, pts, code);
+		assert(equiv);
+
+		equivId = tlid;
+	}
+	else  // search spatially for the boundary chain
+	{
+		GeoDB::Search ss;
+		GeoDB::searchClasses_t searchFilter;
+		searchFilter.set(DB_EDGE);
+		db.InitSearch(&ss, mbr, searchFilter);
+		while ((err = db.getNext(&ss, &fo)) == 0)
+		{
+			GeoDB::Edge* edge = (GeoDB::Edge*)fo.Lock();
+			GeoDB::SpatialClass sc = edge->IsA();
+			long userId = edge->userId;
+			fo.Unlock();
+			if (sc == GeoDB::LINE)
+			{
+				bool equiv = chainEqual(fo, mbr, nPts, pts, code);
+				if (equiv)
+				{
+					equivId = edge->userId;
+					//fprintf(equivFile, "%ld\t%ld\n", rec1.tlid, userId);
+				}
+			}
+
+			if (equivId != 0)
+			{
+				break;
+			}
+		}
+	}
+	return equivId;
+/*	if (equivId != 0)
+	{
+		printf("* %ld (%d) is equivalent to %ld\n", rec1.tlid, stateFips, equivId);
+		nLinesSkipped += 1;
+		continue;
+	}*/
+}
+

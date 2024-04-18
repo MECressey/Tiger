@@ -36,7 +36,7 @@ DbEdgeFaces::DbEdgeFaces( CDatabase* pDB )
 	countyFips = 0;
 	tlid = 0;
 	this->m_nParams = 2;
-	this->m_strFilter = "(T1.STATEFIPS = ? AND T1.COUNTYFIPS = ?)";
+	this->m_strFilter = "(EF.STATEFIPS = ? AND EF.COUNTYFIPS = ?)";
 	//this->m_strSort = "T1.STATEFIPS, T1.COUNTYFIPS, T1.PAFlag DESC";
 }
 

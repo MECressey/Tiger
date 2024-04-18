@@ -55,7 +55,7 @@ CREATE TABLE MEFaces (
 );
 
 BULK INSERT MEFaces
-FROM 'C:\Work\Census\Data\Maine-2023\23027-Waldo\Faces\tl_2023_23027_faceF.tab'
+FROM 'C:\Work\Census\Data\Maine-2023\23013-Knox\Faces\tl_2023_23013_faceF.tab'
 WITH (
   FIRSTROW = 2,
   ROWTERMINATOR = '\n',
@@ -64,7 +64,7 @@ WITH (
 );
 
 BULK INSERT MEEdgeFaces
-FROM 'C:\Work\Census\Data\Maine-2023\23027-Waldo\Edges\tl_2023_23027_edgeE.tab'
+FROM 'C:\Work\Census\Data\Maine-2023\23013-Knox\Edges\tl_2023_23013_edgeE.tab'
 WITH (
   FIRSTROW = 2,
   ROWTERMINATOR = '\n',

@@ -1002,7 +1002,7 @@ int BuildPoly(
 
 				TigerDB::Polygon* poly = (TigerDB::Polygon*)po.Lock();
 
-				poly->userCode = TigerDB::HYDRO_PerennialLakeOrPond;
+				poly->userCode = TigerDB::HYDRO_LakePond;
 				//poly->setArea(-rval);
 				poly->setMBR(mbr);
 				/*if (rval < 0.0)

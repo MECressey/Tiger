@@ -136,6 +136,7 @@
     <ClCompile Include="TgrTransSHP.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <Library Include="..\..\lib\CxxToolsLib.lib" />
     <Library Include="..\..\lib\DbOMDLL.lib" />
     <Library Include="..\..\lib\GeoDBDLL.lib" />
     <Library Include="..\..\lib\GeoToolsDLL.lib" />
