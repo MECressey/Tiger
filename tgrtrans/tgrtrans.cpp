@@ -1724,7 +1724,7 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 				break;
 
 			case 64 :
-				code = TigerDB::ROAD_ServiceDrive;
+				code = TigerDB::ROAD_ServiceDr;
 				break;
 
 			case 65 :
@@ -2214,7 +2214,7 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 				code = TigerDB::HYDRO_IntermittentStream;
 				break;
 			case 13 :
-				code = TigerDB::HYDRO_BraidedStream;
+				code = TigerDB::HYDRO_BraidedStr;
 				break;
 
 			// Man-Made Channel to Transport Water
@@ -2244,7 +2244,7 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 				code = TigerDB::HYDRO_IntermittentReservoir;
 				break;
       case 43: // Treatment Pond
-				code = TigerDB::HYDRO_TreatmentPond;
+				code = TigerDB::HYDRO_TreatmentPd;
 				break;
 
 			// Seaward Body of Water
@@ -2296,7 +2296,7 @@ static TigerDB::Classification MapCFCC( const char *cfcc )
 				code = TigerDB::HYDRO_SpecialWaterFeature;
 				break;
 			case 81 :
-				code = TigerDB::HYDRO_Glacier;
+				code = TigerDB::HYDRO_GlacierOld;
 				break;
 		}
 	  break;
