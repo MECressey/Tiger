@@ -133,7 +133,6 @@
   <ItemGroup>
     <ClCompile Include="bldpoly2.cpp" />
     <ClCompile Include="DbBlocks.cpp" />
-    <ClCompile Include="DBEdgeFaces.cpp" />
     <ClCompile Include="LineTable.cpp" />
     <ClCompile Include="NODETABL.CPP" />
     <ClCompile Include="PolyMake.cpp" />
@@ -142,7 +141,6 @@
   <ItemGroup>
     <ClInclude Include="bldpoly2.h" />
     <ClInclude Include="DbBlocks.h" />
-    <ClInclude Include="DBEdgeFaces.h" />
     <ClInclude Include="LineTable.hpp" />
     <ClInclude Include="NODETABL.HPP" />
     <ClInclude Include="polynode.HPP" />

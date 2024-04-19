@@ -29,7 +29,6 @@
 #include "NODETABL.HPP"
 #include "polynode.HPP"
 #include "bldpoly2.h"
-#include "DbEdgeFaces.h"
 
 using namespace NodeEdgePoly;
 
@@ -122,130 +121,6 @@ static int GetWaterLines(CDatabase& db, LPCTSTR blkTable, int county, CArray<Geo
 	catch(CException *e)
 	{
 		printf("GetWaterLines: C exception\n");
-		nLines = -1;
-	}
-
-	return(nLines);
-}
-
-static int GetWaterLines2023(CDatabase& db, int stateFips, int countyFips, CArray<GeoDB::DirLineId, GeoDB::DirLineId&>& ids)
-{
-	int nLines = 0;
-
-	try
-	{
-		DbEdgeFaces edges(&db);
-		//
-		//	Get the Faces
-		//
-		edges.stateFips = stateFips;
-		edges.countyFips = countyFips;
-		//edges.m_strFilter = "tfidl IN (Select tfid from MEFaces where LWFlag = 'P') AND tfidr IN (Select tfid from MEFaces where LWFlag = 'L')";
-		//edges.m_strFilter = "LEFT OUTER JOIN MEFaces F1 ON tfidl = F1.tfid JOIN MEFaces F2 ON tfidr = F2.tfid WHERE(F1.LWFlag = 'L' OR F1.LWFLAG IS NULL) AND F2.LWFlag = 'P'";
-		//edges.m_strFilter = "(F1.LWFlag = 'L' OR F1.LWFLAG IS NULL) AND F2.LWFlag = 'P'";
-		edges.m_strFilter.Format(_T("(F1.LWFlag = 'L' OR F1.LWFLAG IS NULL) AND F2.LWFlag = 'P' AND EF.stateFips = %d AND EF.countyFips = %d"), stateFips, countyFips);
-		edges.Open(CRecordset::forwardOnly, _T("MEEdgeFaces EF LEFT OUTER JOIN MEFaces F1 ON tfidl = F1.tfid AND EF.stateFips = F1.stateFips AND EF.countyFips = F1.countyFips \
- JOIN MEFaces F2 ON tfidr = F2.tfid AND EF.stateFips = F2.stateFips AND EF.countyFips = F2.countyFips"), CRecordset::readOnly);
-		//edges.Open(CRecordset::forwardOnly, _T("MEEdgeFaces"), CRecordset::readOnly);
-		while (!edges.IsEOF())
-		{
-			GeoDB::DirLineId lineId;
-
-			lineId.id = edges.m_tlid;
-			lineId.dir = 1/*0*/;
-
-			ids.SetAtGrow(nLines, lineId);
-			nLines++;
-			edges.MoveNext();
-		}
-		edges.Close();
-		//edges.m_strFilter = "(F2.LWFlag = 'L' OR F2.LWFLAG IS NULL) AND F1.LWFlag = 'P'";
-		edges.m_strFilter.Format(_T("(F2.LWFlag = 'L' OR F2.LWFLAG IS NULL) AND F1.LWFlag = 'P' AND EF.stateFips = %d AND EF.countyFips = %d"), stateFips, countyFips);
-
-		//edges.Requery();
-		edges.Open(CRecordset::forwardOnly, _T("MEEdgeFaces EF JOIN MEFaces F1 ON tfidl = F1.tfid  AND EF.stateFips = F1.stateFips AND EF.countyFips = F1.countyFips \
-LEFT OUTER JOIN MEFaces F2 ON tfidr = F2.tfid AND EF.stateFips = F2.stateFips AND EF.countyFips = F2.countyFips"), CRecordset::readOnly);
-		while (!edges.IsEOF())
-		{
-			GeoDB::DirLineId lineId;
-
-			lineId.id = edges.m_tlid;
-			lineId.dir = 0/*1*/;
-
-			ids.SetAtGrow(nLines, lineId);
-			nLines++;
-			edges.MoveNext();
-		}
-	}
-	catch (CDBException* e)
-	{
-		//	THROW_LAST();
-		printf("GetWaterLines2023: %s\n", e->m_strError);
-		nLines = -1;
-	}
-	catch (CException* e)
-	{
-		printf("GetWaterLines2023: C exception\n");
-		nLines = -1;
-	}
-
-	return(nLines);
-}
-
-static int GetCountyLines2023(CDatabase& db, int stateFips, int countyFips, CArray<GeoDB::DirLineId, GeoDB::DirLineId&>& ids)
-{
-	int nLines = 0;
-
-	try
-	{
-		DbEdgeFaces edges(&db);
-		//
-		//	Get the Faces
-		//
-
-		edges.m_strFilter.Format(_T("(F1.LWFLAG IS NULL AND F2.LWFlag IS NOT NULL) AND EF.stateFips = %d AND EF.countyFips = %d"), stateFips, countyFips);
-		edges.Open(CRecordset::forwardOnly, _T("MEEdgeFaces EF LEFT OUTER JOIN MEFaces F1 ON tfidl = F1.tfid AND EF.stateFips = F1.stateFips AND EF.countyFips = F1.countyFips \
- JOIN MEFaces F2 ON tfidr = F2.tfid AND EF.stateFips = F2.stateFips AND EF.countyFips = F2.countyFips"), CRecordset::readOnly);
-		//edges.Open(CRecordset::forwardOnly, _T("MEEdgeFaces"), CRecordset::readOnly);
-		while (!edges.IsEOF())
-		{
-			GeoDB::DirLineId lineId;
-
-			lineId.id = edges.m_tlid;
-			lineId.dir = 1/*0*/;
-
-			ids.SetAtGrow(nLines, lineId);
-			nLines++;
-			edges.MoveNext();
-		}
-		edges.Close();
-		//edges.m_strFilter = "(F2.LWFlag = 'L' OR F2.LWFLAG IS NULL) AND F1.LWFlag = 'P'";
-		edges.m_strFilter.Format(_T("(F2.LWFLAG IS NULL AND F1.LWFlag IS NOT NULL) AND EF.stateFips = %d AND EF.countyFips = %d"), stateFips, countyFips);
-
-		//edges.Requery();
-		edges.Open(CRecordset::forwardOnly, _T("MEEdgeFaces EF JOIN MEFaces F1 ON tfidl = F1.tfid  AND EF.stateFips = F1.stateFips AND EF.countyFips = F1.countyFips \
-LEFT OUTER JOIN MEFaces F2 ON tfidr = F2.tfid AND EF.stateFips = F2.stateFips AND EF.countyFips = F2.countyFips"), CRecordset::readOnly);
-		while (!edges.IsEOF())
-		{
-			GeoDB::DirLineId lineId;
-
-			lineId.id = edges.m_tlid;
-			lineId.dir = 0/*1*/;
-
-			ids.SetAtGrow(nLines, lineId);
-			nLines++;
-			edges.MoveNext();
-		}
-	}
-	catch (CDBException* e)
-	{
-		//	THROW_LAST();
-		printf("GetWaterLines2023: %s\n", e->m_strError);
-		nLines = -1;
-	}
-	catch (CException* e)
-	{
-		printf("GetWaterLines2023: C exception\n");
 		nLines = -1;
 	}
 
@@ -450,8 +325,7 @@ int main(int argc, char* argv[])
 */
 			lineIds.SetSize(10000, 1000);
 			
-			if ((nLines = GetWaterLines2023(db, stateFips, countyFips, lineIds)) <= 0)
-			//if ((nLines = GetWaterLines(db, blockTable, countyFips, lineIds)) <= 0)
+			if ((nLines = GetWaterLines(db, blockTable, countyFips, lineIds)) <= 0)
 			{
 				fprintf(stdout, "Error getting Hydro lines: %s\n", (char *)(LPCTSTR)blockTable);
 				return -1;
